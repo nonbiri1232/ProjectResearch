@@ -1,0 +1,141 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+public class Player
+{
+    public int turn = 0;
+    public int maxMemory = 20; //使用可能メモリ
+    public int usableMemory = 0; //現在使えるメモリ
+    public int fieldCost = 0;
+    public int usedMemory = 0;
+
+    public List<Card> hand = new List<Card>();
+    public List<Card> deck = new List<Card>();
+    public List<Card> garbage = new List<Card>();
+    public List<Card> field = new List<Card>();
+    public GameManager gm;
+    public Player(Card[] Deck)
+    {
+        deck.AddRange(Deck);
+        foreach(Card c in Deck)
+        {
+            c.player = this;
+        }
+    }
+
+    private Card RandomSelect(List<Card> target)
+    {
+        int size = target.Count;
+        int rnd = Random.Range(0,size);
+        return target[rnd];
+    }
+
+    public void Shuffle()
+    {
+        for(var i = deck.Count - 1;i > 0;i--){
+            var j = Random.Range(0,i+1);
+            var temp = deck[i];
+            deck[i] = deck[j];
+            deck[j] = temp;
+        }
+    }
+
+    public bool Draw()
+    {
+        if(deck.Count <= 0)
+        {
+            return true;
+        }
+
+        var top = deck.Count-1;
+        var c = deck[top];
+        deck.RemoveAt(top);
+        if(hand.Count >= 8)
+        {
+            garbage.Add(c);
+        }
+        else
+        {
+            hand.Add(c);
+        }
+        return false;
+    }
+
+    public bool Draw(int num)
+    {
+        for(int i = 0;i < num; i++)
+        {
+            if(deck.Count <= 0)
+            {
+                return true;
+            }
+            var top = deck.Count-1;
+            var c = deck[top];
+            deck.RemoveAt(top);
+            if(hand.Count >= 8)
+            {
+                garbage.Add(c);
+            }
+            else
+            {
+                hand.Add(c);
+            }
+        }
+        return false;
+    }
+
+    public void DestoryField(Player enemy,List<Card> target,bool isStartPhase = false)
+    {
+        foreach(var c in target)
+        {
+            if(c.isDaemon == true)
+            {
+                c.player.field.Remove(c);
+                c.Destructor(enemy);
+                fieldCost -= c.Cost;
+                c.player.maxMemory -= c.Cost;
+                maxMemory += c.Cost;
+            }
+            else
+            {
+                c.player.garbage.Add(c);
+                c.player.field.Remove(c);
+                c.Destructor(enemy);
+                fieldCost -= c.Cost;
+                c.player.maxMemory -= c.Cost;
+                maxMemory += c.Cost;
+            }
+            c.Cost -= c.ChangeCost;
+            c.Attack -= c.ChangeAttack;
+            c.Hp -= c.ChangeHp;
+
+            c.ChangeCost = 0;
+            c.ChangeAttack = 0;
+            c.ChangeHp = 0;
+        }
+        if (isStartPhase)
+        {
+            DrawG();
+        }
+    }
+
+    public void DrawG()
+    {
+        if(garbage.Count <= 0)return;
+        var c = RandomSelect(garbage);
+        if(hand.Count >= 8)
+        {
+            return;
+        }
+        garbage.Remove(c);
+        hand.Add(c);
+    }
+    public void PlayFeild(Card c)
+    {
+        field.Add(c);
+        fieldCost += c.Cost;
+        usedMemory += c.Cost;
+        hand.Remove(c);
+    }
+        
+}

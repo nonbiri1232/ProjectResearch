@@ -1,26 +1,27 @@
+using System.Collections.Generic;
 using UnityEngine;
 public class Card
 {
     public enum CardType{Object,Method,Scope}
 
-    public bool isFirstTurn{get;protected set;} = true;
-    public bool isProxy{get;protected set;}
-    public bool isDaemon{get;protected set;}
-    public bool isSandBox{get;protected set;}
-    public bool isSegfault{get;protected set;}
-    public bool isEncrypted{get;protected set;}
-    public bool isImmediate{get;protected set;}
+    public Player player;
+    public bool isFirstTurn{get;set;} = true;
+    public bool isProxy{get;set;}
+    public bool isDaemon{get;set;}
+    public bool isSandBox{get;set;}
+    public bool isSegfault{get;set;}
+    public bool isEncrypted{get;set;}
+    public bool isImmediate{get;set;}
     public int attackTimes{get;protected set;} = 1;
+    public bool isAssert{get;protected set;}
+    public int Assert{get;protected set;}
     public CardType Type {get;protected set;}
+    public int ChangeCost = 0;
     public int Cost{get; set;}
+    public int ChangeAttack = 0;
     public int Attack{get; set;}
+    public int ChangeHp = 0;
     public int Hp{get;set;}
-    protected Card RandomSelect(Card[] target)
-    {
-        int size = target.Length;
-        int rnd = Random.Range(0,size);
-        return target[rnd];
-    }
     public void OnPlay()
     {
         if (isImmediate)
@@ -28,11 +29,21 @@ public class Card
             isFirstTurn = false;
         }      
     }
-    public virtual void Constructor(GameManager mg ,Card[] target = null){}
-    public virtual void Destructor(GameManager mg ,Card[] target = null){}
-    public virtual void Assert(GameManager mg,Card[] target = null){}
-    public virtual void FailSafe(GameManager mg,Card[] target = null){}
-    public virtual void OnTurnStart(GameManager mg ,Card[] target = null){}
-    public virtual void OnTurnEnd(GameManager mg ,Card[] target = null){}
-    public virtual void OnAttack(GameManager mg ,Card[] target = null){}
+    public virtual bool AddCost(Player Enemy,List<Card> target = null){return true;}
+    public virtual void Constructor(Player Enemy,List<Card> target = null){}
+    public virtual void Destructor(Player Enemy,List<Card> target = null){}
+    public virtual void FailSafe(Player Enemy,List<Card> target = null){}
+    public virtual void OnTurnStart(Player Enemy,List<Card> target = null){}
+    public virtual void OnTurnEnd(Player Enemy,List<Card> target = null){}
+    public virtual void OnAttack(Player Enemy,Card target = null){}
+    public virtual void StartPhase(Player Enemy,Card target = null){}
+    public virtual void EndPhase(Player Enemy,Card target = null){}
+    public virtual void ScopeEffect(Player pl,List<Card> target = null){}
+
+    protected Card RandomSelect(List<Card> target)
+    {
+        int size = target.Count;
+        int rnd = Random.Range(0,size);
+        return target[rnd];
+    }
 }
