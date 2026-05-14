@@ -5,6 +5,7 @@ public class Card
     public enum CardType{Object,Method,Scope}
 
     public Player player;
+    public Crest cr;
     public bool isFirstTurn{get;set;} = true;
     public bool isProxy{get;set;}
     public bool isDaemon{get;set;}
@@ -15,6 +16,7 @@ public class Card
     public int attackTimes{get;protected set;} = 1;
     public bool isAssert{get;protected set;}
     public int Assert{get;protected set;}
+    public bool isFailSafe{get;protected set;}
     public CardType Type {get;protected set;}
     public int ChangeCost = 0;
     public int Cost{get; set;}
@@ -36,9 +38,11 @@ public class Card
     public virtual void OnTurnStart(Player Enemy,List<Card> target = null){}
     public virtual void OnTurnEnd(Player Enemy,List<Card> target = null){}
     public virtual void OnAttack(Player Enemy,Card target = null){}
-    public virtual void StartPhase(Player Enemy,Card target = null){}
-    public virtual void EndPhase(Player Enemy,Card target = null){}
+    public virtual void StartPhase(Player Enemy){}
+    public virtual void EndPhase(Player Enemy){}
     public virtual void ScopeEffect(Player pl,List<Card> target = null){}
+    public virtual void CrestOnAttack(Player Enemy,List<Card> target = null){}
+    public virtual void CrestOnPlay(Player Enemy,Card target = null){}
 
     protected Card RandomSelect(List<Card> target)
     {

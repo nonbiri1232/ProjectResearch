@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class SledOverClock : Card
 {
-    SledOverClock()
+    public SledOverClock()
     {
         Cost = 3;
         Attack = 5;
@@ -18,32 +18,34 @@ public class SledOverClock : Card
 
     public override void Constructor(Player Enemy,List<Card> target)
     {
+        cr.effectOnAttack.Add(this);
+        cr.effectOnPlay.Add(this);
         foreach(Card c in player.hand)
         {
             costDownCard.Add(c);
-            c.Cost -= 2;
-            c.ChangeCost = -2;
+            c.Cost += -2;
+            c.ChangeCost += -2;
         }
-        isDownCost = true;
     }
 
-    public override void EndPhase(Player Enemy,Card target = null)
+    public override void EndPhase(Player Enemy)
     {
-        if (isDownCost)
-        {
-            foreach(var c in costDownCard)
-            {
-                c.Cost += c.ChangeCost;
-                c.ChangeCost = 0;
-            }    
-            costDownCard.Clear();
-            isDownCost = false;
-        }
+        cr.effectOnAttack.Remove(this);
+        cr.effectOnPlay.Remove(this);
+    }
+
+    public override void CrestOnPlay(Player Enemy, Card target = null)
+    {
+        target.isImmediate = true;
+    }
+    public override void CrestOnAttack(Player Enemy, List<Card> target = null)
+    {
+        target[0].isSandBox = true;
     }
 }
 public class IncrementProcess : Card
 {
-    IncrementProcess()
+    public IncrementProcess()
     {
         Cost = 1;
         Attack =1;
@@ -52,12 +54,22 @@ public class IncrementProcess : Card
     }
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        if(target[0] != null && target.Count > 0){
-            target[0].Attack += 1;
-            target[0].Hp += 1;
+        Card actualTarget = null;
+        if(target != null && target.Count > 0)
+        {
+            actualTarget = target[0];
         }
-        Attack += 1;
-        Hp += 1;
+        else
+        {
+            if(player.field.Count > 0)
+            {
+                actualTarget = RandomSelect(player.field);
+            }
+        }
+        if(actualTarget != null){
+            actualTarget.Attack += 1;
+            actualTarget.Hp += 1;
+        }
     }
 
     public override void Destructor(Player Enemy, List<Card> target = null)
@@ -68,7 +80,7 @@ public class IncrementProcess : Card
 }
 public class ClockDownBot : Card
 {
-    ClockDownBot()
+    public ClockDownBot()
     {
         Cost = 1;
         Attack = 1;
@@ -78,8 +90,20 @@ public class ClockDownBot : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        if(target[0] != null && target.Count > 0){
-            target[0].Attack -= 3;
+        Card actualTarget = null;
+        if(target != null && target.Count > 0)
+        {
+            actualTarget = target[0];
+        }
+        else
+        {
+            if(Enemy.field.Count > 0)
+            {
+                actualTarget = RandomSelect(Enemy.field);
+            }
+        }
+        if(actualTarget != null){
+            actualTarget.Attack -= 3;
         }
     }
 
@@ -91,7 +115,7 @@ public class ClockDownBot : Card
 
 public class ParallelCompilation : Card
 {
-    ParallelCompilation()
+    public ParallelCompilation()
     {
         Cost = 5;
         Attack = 3;
@@ -113,7 +137,7 @@ public class ParallelCompilation : Card
 
 public class UnSafeArea : Card
 {
-    UnSafeArea()
+    public UnSafeArea()
     {
         Cost = 3;
         Type = CardType.Scope;
@@ -137,7 +161,7 @@ public class UnSafeArea : Card
 
 public class Master : Card
 {
-    Master()
+    public Master()
     {
         isProxy = true;
         isSegfault = true;
@@ -162,11 +186,16 @@ public class Master : Card
         randaomCard.Remove(c1);
         var c2 = RandomSelect(randaomCard);
         randaomCard.Clear();
+        c1.ChangeCost -= c1.Cost;
+        c2.ChangeCost -= c2.Cost;
+        c1.Cost = 0;
+        c2.Cost = 0;
         var action1 = new PlayerAction(ActionType.Play,c1);
         var action2 = new PlayerAction(ActionType.Play,c2);
         player.gm.Play(player,Enemy,action1);
         player.gm.Play(player,Enemy,action2);
     }
 }
+
 
 

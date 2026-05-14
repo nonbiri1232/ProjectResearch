@@ -14,7 +14,7 @@ public class Player
     public List<Card> garbage = new List<Card>();
     public List<Card> field = new List<Card>();
     public GameManager gm;
-    public Player(Card[] Deck)
+    public Player(List<Card> Deck)
     {
         deck.AddRange(Deck);
         foreach(Card c in Deck)
@@ -86,6 +86,10 @@ public class Player
 
     public void DestoryField(Player enemy,List<Card> target,bool isStartPhase = false)
     {
+        if(target == null)
+        {
+            return;
+        }
         foreach(var c in target)
         {
             if(c.isDaemon == true)
@@ -113,10 +117,20 @@ public class Player
             c.ChangeAttack = 0;
             c.ChangeHp = 0;
         }
-        if (isStartPhase)
+        if (isStartPhase && target.Count > 0)
         {
             DrawG();
         }
+    }
+
+    public void DoFailSafe(Player enemy,Card c)
+    {
+        c.ChangeCost += -c.Cost;
+        c.Cost = 0;
+        PlayFeild(c);
+        c.FailSafe(enemy);
+        c.Constructor(enemy);
+        c.OnPlay();
     }
 
     public void DrawG()

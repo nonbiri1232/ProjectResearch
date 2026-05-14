@@ -1,8 +1,12 @@
+using System;
 using System.Collections.Generic;
+using UnityEngine;
+using NUnit.Framework;
 public enum GameState
 {
     Processing,
-    WaitingForInput
+    WaitingForInput,
+    Finished
 }
 
 public enum ActionType
@@ -53,20 +57,27 @@ public class PlayerAction
 
 public class GameManager
 {
+    private Player winner;
+    public event Action<Player> OnGameFinished;
     public GameState currentState;
     public Player turn;
     private const int maxHand = 8;
     Player player1;
     Player player2;
+    Crest cr;
     public int systemTurn = 0;
     public bool isPlayer1Turn = true;
     public Card currentScope = null;
     private PhaseState currentPhase;
 
-    public GameManager(Card[] deck1,Card[] deck2)
+    public GameManager(Player first,Player second)
     {
-        player1 = new Player(deck1);
-        player2 = new Player(deck2);
+        player1 = first;
+        player2 = second;
+        cr = new Crest(player1,player2);
+
+        foreach(var c in player1.deck)c.cr = cr;
+        foreach(var c in player2.deck)c.cr = cr;
 
         player1.Shuffle();
         player2.Shuffle();
@@ -82,6 +93,7 @@ public class GameManager
 
     public void StartPhase(Player move,Player wait)
     {
+        Debug.Log("ターン開始");
         turn = move;
         currentPhase = PhaseState.Start;
         systemTurn++;
@@ -95,7 +107,14 @@ public class GameManager
             foreach(var c in turn.field)
             {
                 c.isFirstTurn = false;
+                c.StartPhase(wait);
+                if(c.isFailSafe)move.DoFailSafe(wait,c);
             }
+        }
+        if (IsFinish(move,wait))
+        {
+            FinishGame();
+            return;
         }
 
         currentState = GameState.WaitingForInput;
@@ -103,13 +122,38 @@ public class GameManager
 
     public void MainPhase(Player move,Player wait)
     {
+        
+        Debug.Log("メインフェイズ");
         currentPhase = PhaseState.Main;    
     }
 
     public void EndPhase(Player move,Player wait)
     {
+        
+        Debug.Log("エンドフェイズ");
         currentPhase = PhaseState.End;
+        if(turn.field.Count > 0)
+        {
+            foreach(var c in turn.field)
+            {
+                if(c.Type == Card.CardType.Object){
+                    c.isFirstTurn = false;
+                    c.EndPhase(wait);
+                }
+                else if(c.Type == Card.CardType.Method)
+                {
+                    List<Card> list = new List<Card>(){c};
+                    c.player.DestoryField(wait,list);
+                    c.EndPhase(wait);
+                }
+            }
+        }
         StartPhase(wait,move);
+        if (IsFinish(move,wait))
+        {
+            FinishGame();
+            return;
+        }
     }
 
     public void ExecuteAction(Player move,Player wait,PlayerAction action)
@@ -144,32 +188,102 @@ public class GameManager
                 }
                 break;
         }
-    }
-    public void Play(Player move,Player wait,PlayerAction action)
-    {
-        if(move.fieldCost + action.sourceCard.Cost > move.maxMemory || move.usedMemory + action.sourceCard.Cost > move.usableMemory) return;
-        if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return;
-        if(!action.sourceCard.AddCost(wait)) return;
-        move.usedMemory += action.sourceCard.Cost;
-        move.PlayFeild(action.sourceCard);
-        action.sourceCard.Constructor(wait,action.targetCard);
-        action.sourceCard.OnPlay();
+        if (IsFinish(move,wait))
+        {
+            FinishGame();
+            return;
+        }
+        
         currentState = GameState.WaitingForInput;
+        
+    }
+    private bool IsFinish(Player pl1,Player pl2)
+    {
+        if(pl1.deck.Count <= 0){
+            winner = pl2;
+            return true;    
+        }
+        if(pl2.deck.Count <= 0)
+        {
+            winner = pl1;
+            return true;
+        }
+        if(pl1.maxMemory <= 0)
+        {
+            winner = pl2;
+            return true;
+        }
+        if(pl2.maxMemory <= 0)
+        {
+            winner = pl1;
+            return true;
+        }
+        return false;
+    }
+    //終了処理
+    private void FinishGame()
+    {
+        currentState = GameState.Finished;
+        OnGameFinished?.Invoke(winner);
+
+        Debug.Log($"ゲーム終了！勝者は {(winner == player1 ? "Player1" : "Player2")} です！");
     }
 
-    public void Attack(Player move,Player wait,PlayerAction action)
+    //実体化の処理
+    public bool Play(Player move,Player wait,PlayerAction action)
     {
+        //プレイできるかを確認
+        if(move.fieldCost + action.sourceCard.Cost > move.maxMemory || move.usedMemory + action.sourceCard.Cost > move.usableMemory) return false;
+        if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
+        if(!action.sourceCard.AddCost(wait)) return false;
+        //カードをプレイする。
+        move.PlayFeild(action.sourceCard);
+        cr.OnPlay(action.sourceCard);
+        action.sourceCard.Constructor(wait,action.targetCard);
+        action.sourceCard.OnPlay();
+        return true;
+    }
+
+    //攻撃行動
+    public bool Attack(Player move,Player wait,PlayerAction action)
+    {
+        List<Card> checkProxy = new List<Card>();
         var source = action.sourceCard;
         var target = action.targetCard[0];
+
+        if (source.isFirstTurn)
+        {
+            return false;
+        }
+        //プロキシがいるかを確認
+        checkProxy.Remove(target);
+        if(!target.isProxy){
+            foreach(var c in checkProxy)
+            {
+                if (c.isProxy)
+                {
+                    return false;
+                }
+            }
+        }
+        int sourceAtk = source.Attack;
+        int targetAtk = target.Attack;
+
+        //能力の処理
         source.OnAttack(wait,target);
+        cr.OnAttack(source,target);
         if(target.Hp <= 0)
         {
             move.DestoryField(wait,action.targetCard);
         }
+        //HPの増減処理
         if(!target.isSandBox)
-            target.Hp -= source.Attack;
+            target.Hp -= sourceAtk;
         if(!source.isSandBox)
-            source.Hp -= target.Attack;
+            source.Hp -= targetAtk;
+        target.isSandBox = false;
+        source.isSandBox = false;
+        //オブジェクトの解放処理
         if(target.Hp <= 0 || source.isSegfault)
         {
             move.DestoryField(wait,action.targetCard);
@@ -179,7 +293,6 @@ public class GameManager
             List<Card> sourceL = new List<Card>{action.sourceCard};
             wait.DestoryField(move,sourceL);
         }
-        currentState = GameState.WaitingForInput;
-        
+        return true;
     }
 }
