@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Unity.Collections;
 
 public class Player
 {
@@ -21,6 +22,11 @@ public class Player
         {
             c.player = this;
         }
+    }
+    public void DirectAttack(Player enemy,Card attacker)
+    {
+        maxMemory += attacker.Attack;
+        enemy.maxMemory -= attacker.Attack;
     }
 
     private Card RandomSelect(List<Card> target)
@@ -96,19 +102,18 @@ public class Player
             {
                 c.player.field.Remove(c);
                 c.Destructor(enemy);
-                fieldCost -= c.Cost;
-                c.player.maxMemory -= c.Cost;
-                maxMemory += c.Cost;
+                c.player.fieldCost -= c.Cost;
             }
             else
             {
                 c.player.garbage.Add(c);
                 c.player.field.Remove(c);
                 c.Destructor(enemy);
-                fieldCost -= c.Cost;
+                c.player.fieldCost -= c.Cost;
                 c.player.maxMemory -= c.Cost;
                 maxMemory += c.Cost;
             }
+            //変更されたステータスの修正
             c.Cost -= c.ChangeCost;
             c.Attack -= c.ChangeAttack;
             c.Hp -= c.ChangeHp;
@@ -116,6 +121,13 @@ public class Player
             c.ChangeCost = 0;
             c.ChangeAttack = 0;
             c.ChangeHp = 0;
+            c.isDaemon = c.Daemon;
+            c.isEncrypted = c.Encrypted;
+            c.isImmediate = c.Immediate;
+            c.isProxy = c.Proxy;
+            c.isSandBox = c.SandBox;
+            c.isSegfault = c.Segfault;
+
         }
         if (isStartPhase && target.Count > 0)
         {

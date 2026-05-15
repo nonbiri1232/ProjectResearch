@@ -1,12 +1,44 @@
 using System.Collections.Generic;
+using NUnit.Framework;
 using UnityEngine;
+public enum where
+{
+    hand,
+    selfField,
+    enemyField
+}
+public class Select
+{
+    public bool isSelectConstructor{get;protected set;}
+    public where whereTarget{get;protected set;}
+    public int numOfSelect{get;protected set;}
+    public Select()
+    {
+        isSelectConstructor = false;
+    }
+    public Select(where tar,int num)
+    {
+        isSelectConstructor = true;
+        whereTarget = tar;
+        numOfSelect = num;
+    }
+
+}
+
 public class Card
 {
     public enum CardType{Object,Method,Scope}
 
     public Player player;
     public Crest cr;
+    public bool isCanAttack{get;set;} = true;
     public bool isFirstTurn{get;set;} = true;
+    public bool Proxy{get;set;}
+    public bool Daemon{get;set;}
+    public bool SandBox{get;set;}
+    public bool Segfault{get;set;}
+    public bool Encrypted{get;set;}
+    public bool Immediate{get;set;}
     public bool isProxy{get;set;}
     public bool isDaemon{get;set;}
     public bool isSandBox{get;set;}
@@ -17,6 +49,7 @@ public class Card
     public bool isAssert{get;protected set;}
     public int Assert{get;protected set;}
     public int isAttacked{get;set;}
+    public Select select;
     public CardType Type {get;protected set;}
     public int ChangeCost = 0;
     public int Cost{get; set;}
@@ -26,10 +59,12 @@ public class Card
     public int Hp{get;set;}
     public void OnPlay()
     {
-        if (isImmediate)
-        {
-            isFirstTurn = false;
-        }      
+        Daemon = isDaemon;
+        Encrypted = isEncrypted;
+        Immediate = isImmediate;
+        Proxy = isProxy;
+        SandBox = isSandBox;
+        Segfault = isSegfault;
     }
     public virtual bool AddCost(Player Enemy,List<Card> target = null){return true;}
     public virtual void Constructor(Player Enemy,List<Card> target = null){}

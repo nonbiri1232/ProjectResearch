@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using NUnit.Framework;
+using System.Linq;
 public enum GameState
 {
     Processing,
@@ -28,6 +29,7 @@ public class PlayerAction
     public ActionType type;
     public Card sourceCard;
     public List<Card> targetCard;
+    public bool isAddCost;
     
     public PlayerAction(){}
     public PlayerAction(ActionType ty)
@@ -46,10 +48,11 @@ public class PlayerAction
         type = ty;
         targetCard.AddRange(target);
     }
-    public PlayerAction(ActionType ty,Card source,Card[] target)
+    public PlayerAction(ActionType ty,Card source,List<Card> target)
     {
         type = ty;
         sourceCard = source;
+        targetCard = new List<Card>();
         targetCard.AddRange(target);
     }
     
@@ -98,6 +101,7 @@ public class GameManager
         currentPhase = PhaseState.Start;
         systemTurn++;
         move.usableMemory = ++move.turn;
+        move.usedMemory = 0;
         if(systemTurn != 1)
         {
             move.Draw();
@@ -114,7 +118,11 @@ public class GameManager
         {
             foreach(var c in turn.deck)
             {
-                if(c.IsFailSafe())move.DoFailSafe(wait,c);
+                if (c.IsFailSafe())
+                {
+                    move.DoFailSafe(wait,c);
+                    break;
+                }
             }
         }
         if (IsFinish(move,wait))
@@ -140,10 +148,11 @@ public class GameManager
         currentPhase = PhaseState.End;
         if(turn.field.Count > 0)
         {
-            foreach(var c in turn.field)
+            foreach(var c in turn.field.ToList())
             {
                 if(c.Type == Card.CardType.Object){
                     c.isFirstTurn = false;
+                    c.isCanAttack = true;
                     c.EndPhase(wait);
                 }
                 else if(c.Type == Card.CardType.Method)
@@ -158,7 +167,11 @@ public class GameManager
         {
             foreach(var c in turn.deck)
             {
-                if(c.IsFailSafe())move.DoFailSafe(wait,c);
+                if(c.IsFailSafe())
+                {
+                    move.DoFailSafe(wait,c);
+                    break;
+                }
             }
         }
         if (IsFinish(move,wait))
@@ -169,9 +182,10 @@ public class GameManager
         StartPhase(wait,move);
     }
 
-    public void ExecuteAction(Player move,Player wait,PlayerAction action)
+    public bool ExecuteAction(Player move,Player wait,PlayerAction action)
     {
-        if(currentState != GameState.WaitingForInput) return;
+        bool isCorrect = false;
+        if(currentState != GameState.WaitingForInput) return false;
 
         currentState = GameState.Processing;
 
@@ -182,21 +196,23 @@ public class GameManager
                 {
                     move.DestoryField(wait,action.targetCard,true);
                     MainPhase(move,wait);
+                    isCorrect = true;
                 }
                 break;
             case PhaseState.Main:
                 switch (action.type)
                 {
                     case ActionType.Attack:
-                        Attack(move,wait,action);
+                        isCorrect = Attack(move,wait,action);
                         break;
                 
                     case ActionType.Play:
-                        Play(move,wait,action);
+                        isCorrect = Play(move,wait,action);
                         break;
                 
                     case ActionType.End :
                         EndPhase(move,wait);
+                        isCorrect = true;
                         break;
                 }
                 break;
@@ -204,10 +220,11 @@ public class GameManager
         if (IsFinish(move,wait))
         {
             FinishGame();
-            return;
+            return true;
         }
         
         currentState = GameState.WaitingForInput;
+        return isCorrect;
         
     }
     private bool IsFinish(Player pl1,Player pl2)
@@ -243,10 +260,10 @@ public class GameManager
     }
 
     //実体化の処理
-    public bool Play(Player move,Player wait,PlayerAction action,bool isAddCost = false)
+    public bool Play(Player move,Player wait,PlayerAction action)
     {
         //プレイできるかを確認
-        if (isAddCost)
+        if (action.isAddCost)
         {
              if(move.fieldCost + action.sourceCard.Cost + 1 > move.maxMemory || move.usedMemory + action.sourceCard.Cost + 1 > move.usableMemory) return false;
             if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
@@ -261,8 +278,9 @@ public class GameManager
 
         //追加コストを払うならコストを1上げて
         //攻撃と体力を+1/+1
-        if (isAddCost)
+        if (action.isAddCost)
         {
+            action.sourceCard.isImmediate = true;
             action.sourceCard.Cost += 1;
             action.sourceCard.Attack += 1;
             action.sourceCard.Hp += 1;
@@ -284,30 +302,67 @@ public class GameManager
     //攻撃行動
     public bool Attack(Player move,Player wait,PlayerAction action)
     {
-        List<Card> checkProxy = new List<Card>();
         var source = action.sourceCard;
-        var target = action.targetCard[0];
-        //出たばかりのターンか？
-        if (source.isFirstTurn)
+        if (!source.isCanAttack)
         {
+            Debug.Log($"何かしらの効果によってこのカードは攻撃できません");
+            return false;
+        }
+        //出たばかりのターンか？
+        if (source.isFirstTurn && !source.isImmediate)
+        {
+            Debug.Log($"このカードは今出たターンです。");
             return false;
         }
         //このターンすでに攻撃しているか
         if (source.isAttacked >= source.attackTimes)
         {
+            Debug.Log($"このカードはすでに攻撃しています。");
             return false;
         }
+        //直接攻撃できるか
+        if(action.targetCard == null && wait.field.Count <= 0 && !source.isFirstTurn)
+        {
+            Debug.Log($"ダイレクトアタックをします");
+            move.DirectAttack(wait,action.sourceCard);
+            source.isEncrypted = false;
+            source.isAttacked++;
+            return true;
+
+        }
+        if(action.targetCard == null && !source.isFirstTurn)
+        {
+            Debug.Log($"このカードは今出たターンです。");
+            return false;
+        }
+        if(action.targetCard == null && wait.field.Count >= 0)
+        {
+            Debug.Log($"相手の場にオブジェクトが残っているのにダイレクトアタックをしようとしています。");
+            return false;
+        }
+        List<Card> checkProxy = new List<Card>(wait.field);
+        
+        var target = action.targetCard[0];
+        
         //プロキシがいるかを確認
         checkProxy.Remove(target);
         if(!target.isProxy){
             foreach(var c in checkProxy)
             {
                 if (c.isProxy)
-                {
+                {           
+                    Debug.Log($"場にプロキシがいるのに攻撃しようとしています。");
                     return false;
                 }
             }
         }
+        //ターゲットが暗号化されているか
+        if (target.isEncrypted)
+        {
+            Debug.Log($"暗号化されているオブジェクトを攻撃しようとしています。");
+            return false;
+        }
+
         int sourceAtk = source.Attack;
         int targetAtk = target.Attack;
 
@@ -318,15 +373,31 @@ public class GameManager
         }
         cr.OnAttack(source,target);
         source.OnAttack(wait,target);
-        if(target.Hp <= 0)
+        if(target.Hp <= 0 || source.Hp <= 0)
         {
-            move.DestoryField(wait,action.targetCard);
+            if(target.Hp <= 0)
+            {
+                move.DestoryField(wait,action.targetCard);
+            }
+            if(source.Hp <= 0)
+            {
+                List<Card> sourceL = new List<Card>{action.sourceCard};
+                wait.DestoryField(move,sourceL);
+            }
+            source.isEncrypted = false;
+            source.isAttacked++;
+            Debug.Log($"攻撃時の能力によって対象が破壊されました。");
+            return true;
         }
         //HPの増減処理
-        if(!target.isSandBox)
+        if(!target.isSandBox){
             target.Hp -= sourceAtk;
-        if(!source.isSandBox)
+            target.ChangeHp -= sourceAtk;
+        }
+        if(!source.isSandBox){
             source.Hp -= targetAtk;
+            source.ChangeHp -= targetAtk;
+        }
         target.isSandBox = false;
         source.isSandBox = false;
         //オブジェクトの解放処理
@@ -339,7 +410,9 @@ public class GameManager
             List<Card> sourceL = new List<Card>{action.sourceCard};
             wait.DestoryField(move,sourceL);
         }
+        source.isEncrypted = false;
         source.isAttacked++;
+        Debug.Log($"攻撃が正常に終了しました。");
         return true;
     }
 }

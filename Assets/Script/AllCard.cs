@@ -13,8 +13,8 @@ public class SledOverClock : Card
         Attack = 5;
         Hp = 1;
         Type = CardType.Object;
+        select = new Select();
     }
-    private List<Card> costDownCard = new List<Card>();
 
     public override void Constructor(Player Enemy,List<Card> target)
     {
@@ -22,9 +22,16 @@ public class SledOverClock : Card
         cr.effectOnPlay.Add(this);
         foreach(Card c in player.hand)
         {
-            costDownCard.Add(c);
-            c.Cost += -2;
-            c.ChangeCost += -2;
+            if(c.Cost >= 5)
+            {
+                c.ChangeCost -= c.Cost;
+                c.Cost -= 2;
+            }
+            else
+            {
+                c.ChangeCost -= c.Cost;
+                c.Cost -= c.Cost;
+            }
         }
     }
     public override void StartPhase(Player Enemy)
@@ -32,7 +39,7 @@ public class SledOverClock : Card
         cr.effectOnAttack.Add(this);
         cr.effectOnPlay.Add(this);
     }
-    public override void EndPhase(Player Enemy)
+    public override void Destructor(Player Enemy, List<Card> target = null)
     {
         cr.effectOnAttack.Remove(this);
         cr.effectOnPlay.Remove(this);
@@ -55,6 +62,7 @@ public class IncrementProcess : Card
         Attack =1;
         Hp = 1;
         Type = CardType.Object;
+        select = new Select(where.selfField,1);
     }
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
@@ -90,6 +98,7 @@ public class ClockDownBot : Card
         Attack = 1;
         Hp = 1;
         Type = CardType.Object;
+        select = new Select(where.enemyField,1);
     }
 
     public override void Constructor(Player Enemy, List<Card> target = null)
@@ -125,6 +134,7 @@ public class ParallelCompilation : Card
         Attack = 3;
         Hp = 3;
         Type = CardType.Object;
+        select = new Select();
     }
 
     public override void Constructor(Player Enemy, List<Card> target = null)
@@ -134,11 +144,39 @@ public class ParallelCompilation : Card
             c.Attack += 3;
             c.Hp += 3;
             c.isImmediate = true;
-            c.OnPlay();
         }
     }
 }
-
+public class PoisonPoint : Card
+{
+    public PoisonPoint()
+    {
+        Cost = 2;
+        Attack = 0;
+        Hp = 2;
+        Type = CardType.Object;
+        select = new Select(where.selfField,1);
+    }
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        Card actualTarget = null;
+        if(target != null && target.Count > 0)
+        {
+            actualTarget = target[0];
+        }
+        else
+        {
+            if(player.field.Count > 0)
+            {
+                actualTarget = RandomSelect(player.field);
+            }
+        }
+        if(actualTarget != null){
+            actualTarget.isSegfault = true;
+            actualTarget.isDaemon = true;
+        }
+    }
+}
 public class UnSafeArea : Card
 {
     public UnSafeArea()
@@ -151,7 +189,6 @@ public class UnSafeArea : Card
     {
         if(target != null){
             target.isImmediate = true;
-            target.OnPlay();
         }
     }
 
@@ -176,6 +213,7 @@ public class Master : Card
         Attack = 1;
         Hp = 10;
         Type = CardType.Object;
+        select = new Select();
     }
 
     public override void Constructor(Player Enemy, List<Card> target = null)
@@ -188,18 +226,29 @@ public class Master : Card
                 randaomCard.Add(c);
             }
         }
-        var c1 = RandomSelect(randaomCard);
-        randaomCard.Remove(c1);
-        var c2 = RandomSelect(randaomCard);
-        randaomCard.Clear();
-        c1.ChangeCost -= c1.Cost;
-        c2.ChangeCost -= c2.Cost;
-        c1.Cost = 0;
-        c2.Cost = 0;
-        var action1 = new PlayerAction(ActionType.Play,c1);
-        var action2 = new PlayerAction(ActionType.Play,c2);
-        player.gm.Play(player,Enemy,action1);
-        player.gm.Play(player,Enemy,action2);
+        if(randaomCard.Count >= 2)
+        {
+            var c1 = RandomSelect(randaomCard);
+            randaomCard.Remove(c1);
+            var c2 = RandomSelect(randaomCard);
+            randaomCard.Clear();
+            c1.ChangeCost -= c1.Cost;
+            c2.ChangeCost -= c2.Cost;
+            c1.Cost = 0;
+            c2.Cost = 0;
+            var action1 = new PlayerAction(ActionType.Play,c1);
+            var action2 = new PlayerAction(ActionType.Play,c2);
+            player.gm.Play(player,Enemy,action1);
+            player.gm.Play(player,Enemy,action2);
+        }
+        else if(randaomCard.Count == 1)
+        {
+            var c1 = randaomCard[0];
+            c1.ChangeCost -= c1.Cost;
+            c1.Cost = 0;
+            var action1 = new PlayerAction(ActionType.Play,c1);
+            player.gm.Play(player,Enemy,action1);
+        }
     }
 }
 public class Raid10 : Card
@@ -211,6 +260,8 @@ public class Raid10 : Card
         Hp = 5;
         isSandBox = true;
         attackTimes = 2;
+        select = new Select();
+        Type = CardType.Object;
     }
 
     public override void Constructor(Player Enemy, List<Card> target = null)
@@ -227,6 +278,172 @@ public class Raid10 : Card
     public override void StartPhase(Player Enemy)
     {
         isSandBox = true;
+    }
+}
+public class RmRf : Card
+{
+    public RmRf()
+    {
+        Cost = 20;
+        Attack = 10;
+        Hp = 3;
+        Type = CardType.Object;
+        select = new Select();
+    }
+
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        player.DestoryField(Enemy,Enemy.field);
+    }
+
+    public override void Destructor(Player Enemy, List<Card> target = null)
+    {
+        Card c = RandomSelect(Enemy.field);
+        List<Card> list = new List<Card>(){c};
+        player.DestoryField(Enemy,list);
+    }
+}
+public class Paging : Card
+{
+    public Paging()
+    {
+        Cost = 2;
+        Type = CardType.Method;
+        select = new Select(where.hand,1);
+    }
+
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        player.deck.Add(target[0]);
+        player.Shuffle();
+        player.Draw(2);
+    }
+}
+public class BackGroundMiner : Card
+{
+    public BackGroundMiner()
+    {
+        isDaemon = true;
+        isProxy = true;
+
+        Cost = 3;
+        Attack = 2;
+        Hp = 2;
+        Type = CardType.Object;
+        select = new Select();
+    }
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        Enemy.maxMemory -= 2;
+        player.maxMemory += 2;
+    }
+}
+public class SystemFreeze : Card
+{
+    public SystemFreeze()
+    {
+        Cost = 5;
+        Attack = 1;
+        Hp = 1;
+        Type = CardType.Object;
+        select = new Select();
+    }
+
+    public override void Destructor(Player Enemy, List<Card> target = null)
+    {
+        player.DestoryField(Enemy,Enemy.field);
+    }
+}
+public class CarnelPanicZero : Card
+{
+    public CarnelPanicZero()
+    {
+        Cost = 1;
+        Attack = 20;
+        Hp = 20;
+        Type = CardType.Object;
+        select = new Select();
+    }
+
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        if(player.maxMemory != 1)
+        {
+            player.field.Remove(this);
+            player.deck.Add(this);
+            player.Shuffle();
+        }
+    }
+    public override void Destructor(Player Enemy, List<Card> target = null)
+    {
+        player.garbage.Remove(this);
+    }
+    public override bool IsFailSafe()
+    {
+        if(player.maxMemory == 1)return true; 
+        if(player.maxMemory > 0 && player.maxMemory <= 3)return true;
+        if(player.maxMemory > 0 && player.maxMemory <= 5)return true;
+        return false;
+    }
+    public override void FailSafe(Player Enemy, List<Card> target = null)
+    {
+        
+        if(player.maxMemory > 0 && player.maxMemory <= 5)
+        {
+            if(Enemy.field.Count > 0){
+                var c = RandomSelect(Enemy.field);
+                c.isCanAttack = false;
+            }
+        }
+        if(player.maxMemory > 0 && player.maxMemory <= 3)
+        {
+            if(player.hand.Count > 0)
+            {
+                foreach(var c in player.hand)
+                {
+                    if(c.Cost >= 5)
+                    {
+                        c.ChangeCost -= c.Cost;
+                        c.Cost -= 5;
+                    }
+                    else
+                    {
+                        c.ChangeCost -= c.Cost;
+                        c.Cost -= c.Cost;
+                    }
+                }
+            }
+        }
+        if(player.maxMemory == 1)
+        {
+            player.DestoryField(Enemy,Enemy.field);
+        }
+    }
+}
+public class AllDelete : Card
+{
+    public AllDelete()
+    {
+        isAssert = true;
+        Assert = 10;
+
+        Cost = 2;
+        Type = CardType.Method;
+        select = new Select();
+    }
+
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        List<Card> allDelete = new List<Card>();
+        if(player.field.Count > 0)
+        {
+            allDelete.AddRange(player.field);
+        }
+        if(Enemy.field.Count > 0)
+        {
+            allDelete.AddRange(Enemy.field);
+        }
+        player.DestoryField(Enemy,allDelete);
     }
 }
 
