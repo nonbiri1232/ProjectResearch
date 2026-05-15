@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
+using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.U2D.IK;
 
 public class SledOverClock : Card
 {
@@ -12,8 +14,6 @@ public class SledOverClock : Card
         Hp = 1;
         Type = CardType.Object;
     }
-
-    private bool isDownCost;
     private List<Card> costDownCard = new List<Card>();
 
     public override void Constructor(Player Enemy,List<Card> target)
@@ -27,7 +27,11 @@ public class SledOverClock : Card
             c.ChangeCost += -2;
         }
     }
-
+    public override void StartPhase(Player Enemy)
+    {
+        cr.effectOnAttack.Add(this);
+        cr.effectOnPlay.Add(this);
+    }
     public override void EndPhase(Player Enemy)
     {
         cr.effectOnAttack.Remove(this);
@@ -143,10 +147,12 @@ public class UnSafeArea : Card
         Type = CardType.Scope;
     }
 
-    public override void ScopeEffect(Player pl,List<Card> target = null)
+    public override void ScopeEffectOnPlay(Player pl,Card target = null)
     {
-        target[0].isImmediate = true;
-        target[0].OnPlay();
+        if(target != null){
+            target.isImmediate = true;
+            target.OnPlay();
+        }
     }
 
     public override bool AddCost(Player Enemy, List<Card> target = null)
@@ -194,6 +200,33 @@ public class Master : Card
         var action2 = new PlayerAction(ActionType.Play,c2);
         player.gm.Play(player,Enemy,action1);
         player.gm.Play(player,Enemy,action2);
+    }
+}
+public class Raid10 : Card
+{
+    public Raid10()
+    {
+        Cost = 8;
+        Attack = 10;
+        Hp = 5;
+        isSandBox = true;
+        attackTimes = 2;
+    }
+
+    public override void Constructor(Player Enemy, List<Card> target = null)
+    {
+        if(player.field.Count > 0){
+            var c1 = RandomSelect(player.field);
+            c1.Attack += 5;
+            c1.Hp += 5;
+            c1.ChangeAttack += 5;
+            c1.ChangeHp += 5;
+        }
+    }
+
+    public override void StartPhase(Player Enemy)
+    {
+        isSandBox = true;
     }
 }
 

@@ -106,9 +106,15 @@ public class GameManager
         {
             foreach(var c in turn.field)
             {
-                c.isFirstTurn = false;
                 c.StartPhase(wait);
-                if(c.isFailSafe)move.DoFailSafe(wait,c);
+                c.isAttacked = 0;
+            }
+        }
+        if(turn.deck.Count > 0)
+        {
+            foreach(var c in turn.deck)
+            {
+                if(c.IsFailSafe())move.DoFailSafe(wait,c);
             }
         }
         if (IsFinish(move,wait))
@@ -143,17 +149,24 @@ public class GameManager
                 else if(c.Type == Card.CardType.Method)
                 {
                     List<Card> list = new List<Card>(){c};
-                    c.player.DestoryField(wait,list);
                     c.EndPhase(wait);
+                    c.player.DestoryField(wait,list);
                 }
             }
         }
-        StartPhase(wait,move);
+        if(turn.deck.Count > 0)
+        {
+            foreach(var c in turn.deck)
+            {
+                if(c.IsFailSafe())move.DoFailSafe(wait,c);
+            }
+        }
         if (IsFinish(move,wait))
         {
             FinishGame();
             return;
         }
+        StartPhase(wait,move);
     }
 
     public void ExecuteAction(Player move,Player wait,PlayerAction action)
@@ -230,17 +243,41 @@ public class GameManager
     }
 
     //実体化の処理
-    public bool Play(Player move,Player wait,PlayerAction action)
+    public bool Play(Player move,Player wait,PlayerAction action,bool isAddCost = false)
     {
         //プレイできるかを確認
-        if(move.fieldCost + action.sourceCard.Cost > move.maxMemory || move.usedMemory + action.sourceCard.Cost > move.usableMemory) return false;
-        if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
-        if(!action.sourceCard.AddCost(wait)) return false;
+        if (isAddCost)
+        {
+             if(move.fieldCost + action.sourceCard.Cost + 1 > move.maxMemory || move.usedMemory + action.sourceCard.Cost + 1 > move.usableMemory) return false;
+            if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
+            if(!action.sourceCard.AddCost(wait)) return false;
+        }else{
+            if(move.fieldCost + action.sourceCard.Cost > move.maxMemory || move.usedMemory + action.sourceCard.Cost > move.usableMemory) return false;
+            if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
+            if(!action.sourceCard.AddCost(wait)) return false;
+        }
+       
         //カードをプレイする。
-        move.PlayFeild(action.sourceCard);
+
+        //追加コストを払うならコストを1上げて
+        //攻撃と体力を+1/+1
+        if (isAddCost)
+        {
+            action.sourceCard.Cost += 1;
+            action.sourceCard.Attack += 1;
+            action.sourceCard.Hp += 1;
+            action.sourceCard.ChangeCost += 1;
+            action.sourceCard.ChangeAttack += 1;
+            action.sourceCard.ChangeHp += 1;
+        }
+        if(currentScope != null)
+        {
+            currentScope.ScopeEffectOnPlay(wait,action.sourceCard);
+        }
         cr.OnPlay(action.sourceCard);
         action.sourceCard.Constructor(wait,action.targetCard);
         action.sourceCard.OnPlay();
+        move.PlayFeild(action.sourceCard);
         return true;
     }
 
@@ -250,8 +287,13 @@ public class GameManager
         List<Card> checkProxy = new List<Card>();
         var source = action.sourceCard;
         var target = action.targetCard[0];
-
+        //出たばかりのターンか？
         if (source.isFirstTurn)
+        {
+            return false;
+        }
+        //このターンすでに攻撃しているか
+        if (source.isAttacked >= source.attackTimes)
         {
             return false;
         }
@@ -270,8 +312,12 @@ public class GameManager
         int targetAtk = target.Attack;
 
         //能力の処理
-        source.OnAttack(wait,target);
+        if(currentScope != null)
+        {
+            currentScope.ScopeEffectOnAttack(wait,action.targetCard);
+        }
         cr.OnAttack(source,target);
+        source.OnAttack(wait,target);
         if(target.Hp <= 0)
         {
             move.DestoryField(wait,action.targetCard);
@@ -293,6 +339,7 @@ public class GameManager
             List<Card> sourceL = new List<Card>{action.sourceCard};
             wait.DestoryField(move,sourceL);
         }
+        source.isAttacked++;
         return true;
     }
 }

@@ -146,10 +146,16 @@ public class Player
     }
     public void PlayFeild(Card c)
     {
-        field.Add(c);
-        fieldCost += c.Cost;
         usedMemory += c.Cost;
-        hand.Remove(c);
-    }
-        
+        if(c.Type == Card.CardType.Scope)
+        {
+            gm.currentScope = c;
+        }
+        else
+        {            
+            field.Add(c);
+            fieldCost += c.Cost;
+            hand.Remove(c);
+        }
+    }   
 }

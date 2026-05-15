@@ -16,7 +16,7 @@ public class Card
     public int attackTimes{get;protected set;} = 1;
     public bool isAssert{get;protected set;}
     public int Assert{get;protected set;}
-    public bool isFailSafe{get;protected set;}
+    public int isAttacked{get;set;}
     public CardType Type {get;protected set;}
     public int ChangeCost = 0;
     public int Cost{get; set;}
@@ -34,13 +34,15 @@ public class Card
     public virtual bool AddCost(Player Enemy,List<Card> target = null){return true;}
     public virtual void Constructor(Player Enemy,List<Card> target = null){}
     public virtual void Destructor(Player Enemy,List<Card> target = null){}
+    public virtual bool IsFailSafe(){return false;}
     public virtual void FailSafe(Player Enemy,List<Card> target = null){}
     public virtual void OnTurnStart(Player Enemy,List<Card> target = null){}
     public virtual void OnTurnEnd(Player Enemy,List<Card> target = null){}
     public virtual void OnAttack(Player Enemy,Card target = null){}
     public virtual void StartPhase(Player Enemy){}
     public virtual void EndPhase(Player Enemy){}
-    public virtual void ScopeEffect(Player pl,List<Card> target = null){}
+    public virtual void ScopeEffectOnAttack(Player pl,List<Card> target = null){}
+    public virtual void ScopeEffectOnPlay(Player pl,Card target = null){}
     public virtual void CrestOnAttack(Player Enemy,List<Card> target = null){}
     public virtual void CrestOnPlay(Player Enemy,Card target = null){}
 
