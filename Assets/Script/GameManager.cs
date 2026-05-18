@@ -288,6 +288,7 @@ public class GameManager
             action.sourceCard.ChangeAttack += 1;
             action.sourceCard.ChangeHp += 1;
         }
+        move.PlayFeild(action.sourceCard);
         if(currentScope != null)
         {
             currentScope.ScopeEffectOnPlay(wait,action.sourceCard);
@@ -295,7 +296,6 @@ public class GameManager
         cr.OnPlay(action.sourceCard);
         action.sourceCard.Constructor(wait,action.targetCard);
         action.sourceCard.OnPlay();
-        move.PlayFeild(action.sourceCard);
         return true;
     }
 

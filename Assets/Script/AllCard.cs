@@ -33,6 +33,7 @@ public class SledOverClock : Card
                 c.Cost -= c.Cost;
             }
         }
+        isImmediate = true;
     }
     public override void StartPhase(Player Enemy)
     {
@@ -80,7 +81,9 @@ public class IncrementProcess : Card
         }
         if(actualTarget != null){
             actualTarget.Attack += 1;
+            actualTarget.ChangeAttack += 1;
             actualTarget.Hp += 1;
+            actualTarget.ChangeHp += 1;
         }
     }
 
@@ -115,8 +118,18 @@ public class ClockDownBot : Card
                 actualTarget = RandomSelect(Enemy.field);
             }
         }
-        if(actualTarget != null){
-            actualTarget.Attack -= 3;
+        if(actualTarget != null)
+        {
+            if(actualTarget.Attack >= 3)
+            {
+                actualTarget.Attack -= 3;
+                actualTarget.ChangeAttack -= 3;
+            }
+            else
+            {
+                actualTarget.ChangeAttack -= actualTarget.Attack;
+                actualTarget.Attack = 0;
+            }
         }
     }
 
@@ -142,7 +155,9 @@ public class ParallelCompilation : Card
         foreach(var c in player.field)
         {
             c.Attack += 3;
+            c.ChangeAttack += 3;
             c.Hp += 3;
+            c.ChangeHp += 3;
             c.isImmediate = true;
         }
     }
@@ -175,6 +190,8 @@ public class PoisonPoint : Card
             actualTarget.isSegfault = true;
             actualTarget.isDaemon = true;
         }
+        isSegfault = true;
+        isDaemon = true;
     }
 }
 public class UnSafeArea : Card
@@ -183,6 +200,7 @@ public class UnSafeArea : Card
     {
         Cost = 3;
         Type = CardType.Scope;
+        select = new Select();
     }
 
     public override void ScopeEffectOnPlay(Player pl,Card target = null)
@@ -293,7 +311,8 @@ public class RmRf : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        player.DestoryField(Enemy,Enemy.field);
+        List<Card> targetList = new List<Card>(Enemy.field);
+        player.DestoryField(Enemy, targetList);
     }
 
     public override void Destructor(Player Enemy, List<Card> target = null)
@@ -315,6 +334,7 @@ public class Paging : Card
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
         player.deck.Add(target[0]);
+        player.hand.Remove(target[0]);
         player.Shuffle();
         player.Draw(2);
     }
@@ -351,7 +371,8 @@ public class SystemFreeze : Card
 
     public override void Destructor(Player Enemy, List<Card> target = null)
     {
-        player.DestoryField(Enemy,Enemy.field);
+        List<Card> targetList = new List<Card>(Enemy.field);
+        player.DestoryField(Enemy, targetList);
     }
 }
 public class CarnelPanicZero : Card
@@ -416,7 +437,8 @@ public class CarnelPanicZero : Card
         }
         if(player.maxMemory == 1)
         {
-            player.DestoryField(Enemy,Enemy.field);
+            List<Card> targetList = new List<Card>(Enemy.field);
+            player.DestoryField(Enemy, targetList);
         }
     }
 }

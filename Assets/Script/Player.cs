@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Unity.Collections;
+using System.Linq;
 
 public class Player
 {
@@ -96,19 +97,19 @@ public class Player
         {
             return;
         }
-        foreach(var c in target)
+        foreach(var c in target.ToList())
         {
             if(c.isDaemon == true)
             {
                 c.player.field.Remove(c);
-                c.Destructor(enemy);
+                c.Destructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
             }
             else
             {
                 c.player.garbage.Add(c);
                 c.player.field.Remove(c);
-                c.Destructor(enemy);
+                c.Destructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
                 c.player.maxMemory -= c.Cost;
                 maxMemory += c.Cost;
@@ -139,10 +140,12 @@ public class Player
     {
         c.ChangeCost += -c.Cost;
         c.Cost = 0;
-        PlayFeild(c);
-        c.FailSafe(enemy);
+        field.Add(c);
+        deck.Remove(c);
         c.Constructor(enemy);
         c.OnPlay();
+        c.FailSafe(enemy);
+        Debug.Log($"フェイルセーフが発動しました。");
     }
 
     public void DrawG()

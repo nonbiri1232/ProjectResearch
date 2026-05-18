@@ -85,8 +85,8 @@ public class GameVisual : MonoBehaviour
     private void UpdateUI()
     {
         systemText.text = gm.turn == player1 ? "Player 1 Turn" : "Player 2 Turn";
-        p1MemoryText.text = $"P1 Memory: {player1.fieldCost} / {player1.maxMemory} \n {player1.usedMemory} / {player1.usableMemory}";
-        p2MemoryText.text = $"P2 Memory: {player2.fieldCost} / {player2.maxMemory} \n {player2.usedMemory} / {player2.usableMemory}";
+        p1MemoryText.text = $"P1 Memory: {player1.fieldCost} / {player1.maxMemory} \n {player1.usedMemory} / {player1.usableMemory} \n {player1.deck.Count} / 40";
+        p2MemoryText.text = $"P2 Memory: {player2.fieldCost} / {player2.maxMemory} \n {player2.usedMemory} / {player2.usableMemory} \n {player2.deck.Count} / 40";
 
         DrawHand(player1, p1HandArea);
         DrawHand(player2, p2HandArea);

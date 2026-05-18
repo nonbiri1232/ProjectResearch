@@ -3,6 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 public enum where
 {
+    None,
     hand,
     selfField,
     enemyField
@@ -15,6 +16,7 @@ public class Select
     public Select()
     {
         isSelectConstructor = false;
+        whereTarget = where.None;
     }
     public Select(where tar,int num)
     {
