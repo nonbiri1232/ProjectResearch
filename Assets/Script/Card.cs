@@ -89,4 +89,13 @@ public class Card
         int rnd = Random.Range(0,size);
         return target[rnd];
     }
+
+    public void SettingBasicCard(int i)
+    {
+        Cost = i;
+        Attack = i;
+        Hp = i;
+        Type = CardType.Object;
+        select = new Select();
+    }
 }

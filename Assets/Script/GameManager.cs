@@ -43,9 +43,10 @@ public class PlayerAction
        sourceCard = source;
     }
     
-    public PlayerAction(ActionType ty,Card[] target)
+    public PlayerAction(ActionType ty,List<Card> target)
     {
         type = ty;
+        targetCard = new List<Card>();
         targetCard.AddRange(target);
     }
     public PlayerAction(ActionType ty,Card source,List<Card> target)
@@ -71,7 +72,7 @@ public class GameManager
     public int systemTurn = 0;
     public bool isPlayer1Turn = true;
     public Card currentScope = null;
-    private PhaseState currentPhase;
+    public PhaseState currentPhase;
 
     public GameManager(Player first,Player second)
     {

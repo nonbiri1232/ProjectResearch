@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using NUnit.Framework.Constraints;
 using UnityEngine.Assemblies;
 using Unity.VisualScripting;
+using UnityEngine.Timeline;
 
 public class GameVisual : MonoBehaviour
 {
@@ -53,8 +54,8 @@ public class GameVisual : MonoBehaviour
     }; 
     void Start()
     {
-        player1 = new Player(deck);
-        player2 = new Player(CreateDummyDeck());
+        player1 = new Player(CreateBasicCardDeck());
+        player2 = new Player(CreateBasicCardDeck());
 
         gm = new GameManager(player1, player2);
 
@@ -72,21 +73,11 @@ public class GameVisual : MonoBehaviour
         gm.ExecuteAction(gm.turn, GetEnemyPlayer(), action); 
         UpdateUI();
     }
-
-    public void OnSelfGarbageClicked()
-    {
-        PlayerAction action = new PlayerAction();
-        action.type = ActionType.SelfGarbage;
-
-        gm.ExecuteAction(gm.turn, GetEnemyPlayer(), action); 
-        UpdateUI();
-    }
-
     private void UpdateUI()
     {
-        systemText.text = gm.turn == player1 ? "Player 1 Turn" : "Player 2 Turn";
-        p1MemoryText.text = $"P1 Memory: {player1.fieldCost} / {player1.maxMemory} \n {player1.usedMemory} / {player1.usableMemory} \n {player1.deck.Count} / 40";
-        p2MemoryText.text = $"P2 Memory: {player2.fieldCost} / {player2.maxMemory} \n {player2.usedMemory} / {player2.usableMemory} \n {player2.deck.Count} / 40";
+        systemText.text = (gm.turn == player1 ? "Turn: Player 1" : "Turn: Player 2") + " " + $" Phase: {gm.currentPhase}";
+        p1MemoryText.text = $"field/maxMemory: {player1.fieldCost} / {player1.maxMemory} \nused/usable: {player1.usedMemory} / {player1.usableMemory} \ndeckNum {player1.deck.Count}\n garbageNum {player1.garbage.Count}";
+        p2MemoryText.text = $"field/maxMemory: {player2.fieldCost} / {player2.maxMemory} \nused/usable: {player2.usedMemory} / {player2.usableMemory} \ndeckNum {player2.deck.Count}\n garbageNum {player2.garbage.Count}";
 
         DrawHand(player1, p1HandArea);
         DrawHand(player2, p2HandArea);
@@ -115,6 +106,7 @@ public class GameVisual : MonoBehaviour
         }
     }
 
+
     private void DrawField(Player targetPlayer, Transform fieldArea)
     {
         foreach(Transform child in fieldArea)
@@ -134,34 +126,6 @@ public class GameVisual : MonoBehaviour
             btn.onClick.AddListener(()=>OnClickCardField(c));
         }
     }
-    private int selectNum;
-    private void OnClickCardHand(Card c,Select select)
-    {
-        if(c.player == gm.turn)
-        {
-            selectedPlayCard = c;
-            if(select.whereTarget == where.hand)
-            {
-                SelectCard.SetActive(true);
-                DrawSelectCard(select);
-            }
-            else if (select.isSelectConstructor && IsSelf(select).field.Count > 0)
-            {
-                witchPlaySelect.SetActive(true);
-                DrawSelectCard(select);
-            }
-            else
-            {    
-                witchPlay.SetActive(true);
-            }
-        }
-    }
-    private Player IsSelf(Select select)
-    {
-        if(select.whereTarget == where.selfField)return gm.turn;
-        else return GetEnemyPlayer();
-    }
-
     private void DrawSelectCard(Select select)
     {
         Transform selectArea = SelectCard.GetComponent<Transform>();
@@ -196,6 +160,73 @@ public class GameVisual : MonoBehaviour
             btn.onClick.AddListener(()=>OnclickSelect(select,c));
         }
     }
+    private int selectNum;
+    private void OnClickCardHand(Card c,Select select)
+    {
+        if(gm.currentPhase != PhaseState.Main) return;
+        if(c.player == gm.turn && c.Cost <= c.player.maxMemory - c.player.fieldCost && c.Cost <= c.player.usableMemory - c.player.usedMemory)
+        {
+            selectedPlayCard = c;
+            if(c.Type == Card.CardType.Object)
+            {
+                if(select.whereTarget == where.hand)
+                {
+                    DrawSelectCard(select);
+                    if(c.Cost + 1 <= c.player.maxMemory - c.player.fieldCost && c.Cost + 1 <= c.player.usableMemory - c.player.usedMemory)
+                        witchPlaySelect.SetActive(true);
+                    else{
+                        SelectCard.SetActive(true);
+                        isCostAdd = false;
+                    }
+                }
+                else if (select.isSelectConstructor && IsSelf(select).field.Count > 0)
+                {
+                    DrawSelectCard(select);
+                    if(c.Cost + 1 <= c.player.maxMemory - c.player.fieldCost && c.Cost + 1 <= c.player.usableMemory - c.player.usedMemory)
+                        witchPlaySelect.SetActive(true);
+                    else{
+                        SelectCard.SetActive(true);
+                        isCostAdd = false;
+                    }
+                }
+                else
+                {    
+                    if(c.Cost + 1 <= c.player.maxMemory - c.player.fieldCost && c.Cost + 1 <= c.player.usableMemory - c.player.usedMemory)
+                        witchPlay.SetActive(true);
+                    else
+                        PlayAction(false);
+                }
+            }
+            else if(c.Type == Card.CardType.Method)
+            {
+                if(select.whereTarget == where.hand)
+                {
+                    SelectCard.SetActive(true);
+                    DrawSelectCard(select);
+                }
+                else if (select.isSelectConstructor && IsSelf(select).field.Count > 0)
+                {
+                    SelectCard.SetActive(true);
+                    DrawSelectCard(select);
+                }
+                else
+                {
+                    PlayAction(false);
+                }
+            }
+            else
+            {
+                PlayAction(false);
+            }
+            
+        }
+    }
+    private Player IsSelf(Select select)
+    {
+        if(select.whereTarget == where.selfField)return gm.turn;
+        else return GetEnemyPlayer();
+    }
+    
     
     private void OnclickSelect(Select select,Card c)
     {
@@ -257,9 +288,9 @@ public class GameVisual : MonoBehaviour
     
     private void OnClickCardField(Card c)
     {
-        
+        if(gm.currentPhase != PhaseState.Main) return;
         selectedAttackCard = c;
-        if(c.player == gm.turn)
+        if(c.player == gm.turn && (c.isImmediate || !c.isFirstTurn) && c.isCanAttack)
         {
             SelectCard.SetActive(true);
             if(GetEnemyPlayer().field.Count > 0)
@@ -336,18 +367,78 @@ public class GameVisual : MonoBehaviour
         btn.onClick.AddListener(()=>AttackAction(null));
     }
 
-    
+    public void OnSelfGarbageClicked()
+    {
+        if(gm.currentPhase != PhaseState.Start) return;
+        SelectCard.SetActive(true);
+        DrawSelectCardSelfGarbage();
+    }
+    private void DrawSelectCardSelfGarbage()
+    {
+        Transform selectArea = SelectCard.GetComponent<Transform>();
+        foreach(Transform child in selectArea)
+        {
+            Destroy(child.gameObject);
+        }
+        List<Card> field = gm.turn.field;
+
+        GameObject decide = Instantiate(cardButtonPrefab, selectArea);
+
+        TextMeshProUGUI decideText = decide.GetComponentInChildren<TextMeshProUGUI>();
+        
+        decideText.text = $"Decide"; 
+
+        Button decidebtn = decide.GetComponent<Button>();
+
+        decidebtn.onClick.AddListener(()=>DecideSelfGarbage());
+        foreach(Card c in field)
+        {
+            GameObject cardObj = Instantiate(cardButtonPrefab, selectArea);
+
+            TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
+            
+            btnText.text = $"Cost:{c.Cost}\n{c.GetType().Name}\nATK:{c.Attack} HP:{c.Hp}"; 
+
+            Button btn = cardObj.GetComponent<Button>();
+
+            btn.onClick.AddListener(()=>AddSelfGarbage(c,cardObj));
+        }
+    }
+    List<Card> selfGarbageList = new List<Card>();
+    private void AddSelfGarbage(Card c,GameObject obj)
+    {
+        selfGarbageList.Add(c);
+        Destroy(obj);
+    }
+    private void DecideSelfGarbage()
+    {
+        SelectCard.SetActive(false);
+        var action = new PlayerAction(ActionType.SelfGarbage,selfGarbageList);
+        bool isCorrect;
+        isCorrect = gm.ExecuteAction(gm.turn,GetEnemyPlayer(),action);
+        selfGarbageList.Clear();
+        if (isCorrect)
+        {
+            UpdateUI();
+        }
+    }
 
     private Player GetEnemyPlayer()
     {
         return gm.turn == player1 ? player2 : player1;
     }
 
-    private List<Card> CreateDummyDeck()
+    private List<Card> CreateBasicCardDeck()
     {
         List<Card> deck = new List<Card>();
-        for (int i = 0; i < 20; i++) {
-            deck.Add(new IncrementProcess());
+        for (int i = 1; i < 11; i++)
+        {
+            for(int j = 0;j < 4; j++)
+            {
+                Card c = new Card();
+                c.SettingBasicCard(i);
+                deck.Add(c);
+            }
         }
         return deck;
     }
