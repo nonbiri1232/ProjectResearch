@@ -1,4 +1,4 @@
-# ALLO SEIZE - Hacking Card Game
+# ALLO SEIZE - Trading Card Game
 
 ハッキングとプログラミングをテーマにした本格デジタルカードゲーム
 
