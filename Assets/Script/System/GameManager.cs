@@ -11,6 +11,7 @@ public enum GameState
 
 public enum ActionType
 {
+    Marigan,
     SelfGarbage,
     Play,
     Attack,
@@ -72,11 +73,14 @@ public class GameManager
     public bool isPlayer1Turn = true;
     public Card currentScope = null;
     public PhaseState currentPhase;
+    List<Player> Didmarigan = new List<Player>();
 
     public GameManager(Player first,Player second)
     {
         player1 = first;
         player2 = second;
+        Didmarigan.Add(first);
+        Didmarigan.Add(second);
         cr = new Crest(player1,player2);
 
         foreach(var c in player1.deck)c.cr = cr;
@@ -130,7 +134,10 @@ public class GameManager
             FinishGame();
             return;
         }
-
+        if(turn.field.Count == 0 && systemTurn != 1)
+        {
+            MainPhase(move,wait);
+        }
         currentState = GameState.WaitingForInput;
     }
 
@@ -181,7 +188,6 @@ public class GameManager
         }
         StartPhase(wait,move);
     }
-
     public bool ExecuteAction(Player move,Player wait,PlayerAction action)
     {
         bool isCorrect = false;
@@ -192,11 +198,25 @@ public class GameManager
         switch (currentPhase)
         {
             case PhaseState.Start:
-                if(action.type == ActionType.SelfGarbage)
+                switch(action.type)
                 {
-                    move.DestoryField(wait,action.targetCard,true);
-                    MainPhase(move,wait);
-                    isCorrect = true;
+                    case ActionType.SelfGarbage:
+                        move.DestoryField(wait,action.targetCard,true);
+                        MainPhase(move,wait);
+                        isCorrect = true;
+                        break;
+                    case ActionType.Marigan:
+                        if(systemTurn == 1 && Didmarigan.Contains(move)){
+                            move.Marigan(action.targetCard);
+                            Debug.Log($"マリガンを実行しました");
+                            Didmarigan.Remove(move);
+                            if(Didmarigan.Count == 0)
+                            {    
+                                MainPhase(move,wait);
+                            }
+                            isCorrect = true;
+                        }                        
+                        break;
                 }
                 break;
             case PhaseState.Main:

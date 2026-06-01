@@ -6,6 +6,8 @@ using NUnit.Framework.Constraints;
 using UnityEngine.Assemblies;
 using Unity.VisualScripting;
 using UnityEngine.Timeline;
+using UnityEngine.Experimental.AI;
+using UnityEngine.EventSystems;
 
 public class GameVisual : MonoBehaviour
 {
@@ -30,7 +32,14 @@ public class GameVisual : MonoBehaviour
     public GameObject witchPlay;
     public GameObject witchPlaySelect;
     public GameObject SelectCard;
-
+    public GameObject MariganField;
+    public GameObject MariganFieldPlayer1;
+    public GameObject MariganFieldPlayer2;
+    [Header("Card DBS")]
+    public CardConect cardDatabase;
+    [Header("Card PopUp")]
+    public GameObject cardPopupPanel;
+    public TextMeshProUGUI cardPopupText;
     private GameManager gm;
     private Player player1;
     private Player player2;
@@ -48,13 +57,15 @@ public class GameVisual : MonoBehaviour
     }
 
     List<Card> deck = new List<Card>(){
-        new SledOverClock(),new IncrementProcess(),new ClockDownBot(),new ParallelCompilation(),
-        new PoisonPoint(),new UnSafeArea(),new Master(),new Raid10(),new RmRf(),new Paging(),new BackGroundMiner(),
+        new SledOverClock(),new SledOverClock(),new SledOverClock(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),
+        new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ParallelCompilation(),
+        new PoisonPoint(),new PoisonPoint(),new PoisonPoint(),new UnSafeArea(),new Master(),new Raid10(),new RmRf(),
+        new Paging(),new Paging(),new Paging(),new Paging(),new BackGroundMiner(),
         new SystemFreeze(),new CarnelPanicZero(),new AllDelete()
     }; 
     void Start()
     {
-        player1 = new Player(CreateBasicCardDeck());
+        player1 = new Player(deck);
         player2 = new Player(CreateBasicCardDeck());
 
         gm = new GameManager(player1, player2);
@@ -62,9 +73,124 @@ public class GameVisual : MonoBehaviour
         endTurnButton.onClick.AddListener(OnEndTurnClicked);
         selfGarbageButton.onClick.AddListener(OnSelfGarbageClicked);
 
+        DrawMarigan(player1,player2);
+
         UpdateUI();
     }
+    private void DrawMarigan(Player pl1,Player pl2)
+    {
+        Transform trf1 = MariganFieldPlayer1.GetComponent<Transform>();
+        Transform trf2 = MariganFieldPlayer2.GetComponent<Transform>();
+        foreach(Transform t in trf1)
+        {
+            Destroy(t.gameObject);
+        }
+        //player1のマリガン決定ボタン表示
+        GameObject decide1 = Instantiate(cardButtonPrefab,trf1);
 
+        TextMeshProUGUI btnText1 = decide1.GetComponentInChildren<TextMeshProUGUI>();
+            
+        btnText1.text = $"Decide"; 
+
+        Button btn1 = decide1.GetComponent<Button>();
+
+        btn1.onClick.AddListener(()=>DecideMarigan(pl1,decide1));
+        
+        //player2のマリガン決定ボタン表示
+        GameObject decide2 = Instantiate(cardButtonPrefab,trf2);
+
+        TextMeshProUGUI btnText2 = decide2.GetComponentInChildren<TextMeshProUGUI>();
+            
+        btnText2.text = $"Decide"; 
+
+        Button btn2 = decide2.GetComponent<Button>();
+
+        btn2.onClick.AddListener(()=>DecideMarigan(pl2,decide2));
+
+        foreach(Card c in pl1.hand)
+        {
+            GameObject cardObj = Instantiate(cardButtonPrefab,trf1);
+
+            TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
+            
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+
+            Button btn = cardObj.GetComponent<Button>();
+
+            btn.onClick.AddListener(()=>AddMarigan(c,cardObj));
+        }
+        foreach(Card c in pl2.hand)
+        {
+            GameObject cardObj = Instantiate(cardButtonPrefab,trf2);
+
+            TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
+            
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+
+            Button btn = cardObj.GetComponent<Button>();
+
+            btn.onClick.AddListener(()=>AddMarigan(c,cardObj));
+        }
+    }
+    List<Card> marigan1 = new List<Card>();
+    List<Card> marigan2 = new List<Card>();
+    private void AddMarigan(Card c,GameObject obj)
+    {
+    
+        Image img = obj.GetComponent<Image>();
+        if(c.player == player1)
+        {
+            if (marigan1.Contains(c))
+            {
+                marigan1.Remove(c);        
+                img.color = Color.white;
+            }
+            else
+            {
+                marigan1.Add(c); 
+                img.color = Color.gray;
+            }
+        }
+        else
+        {
+            if (marigan2.Contains(c))
+            {
+                marigan2.Remove(c);        
+                img.color = Color.white;
+            }
+            else
+            {
+                marigan2.Add(c); 
+                img.color = Color.gray;
+            }
+        }
+    }
+    int decidePlayer = 0;
+    private void DecideMarigan(Player pl,GameObject obj)
+    {
+        decidePlayer++;
+        Destroy(obj);
+        MariganAction();
+    }
+    private void MariganAction()
+    {
+        if(decidePlayer == 2)
+        {
+            PlayerAction action1 = new PlayerAction(ActionType.Marigan,marigan1);
+            PlayerAction action2 = new PlayerAction(ActionType.Marigan,marigan2);
+            Debug.Log($"{gm.systemTurn}が今のターン数");
+            bool isCorrect1 = gm.ExecuteAction(player1,player2,action1);
+            bool isCorrect2 = gm.ExecuteAction(player2,player1,action2);
+            
+            Debug.Log($"isCorrect1={isCorrect1} isCorrect2={isCorrect2}");
+            if (isCorrect1 && isCorrect2)
+            {
+                UpdateUI();
+                Debug.Log($"画面をアップデートします");
+            }
+            MariganField.SetActive(false);
+        }
+    }
     public void OnEndTurnClicked()
     {
         PlayerAction action = new PlayerAction();
@@ -84,7 +210,6 @@ public class GameVisual : MonoBehaviour
         DrawField(player1, p1FieldArea);
         DrawField(player2, p2FieldArea);
     }
-
     private void DrawHand(Player targetPlayer, Transform handArea)
     {
         foreach (Transform child in handArea)
@@ -98,15 +223,26 @@ public class GameVisual : MonoBehaviour
             
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
-            btnText.text = $"Cost:{c.Cost}\n{c.GetType().Name}"; 
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}"; 
+
+            EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
+            if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
+
+            EventTrigger.Entry entryEnter = new EventTrigger.Entry();
+            entryEnter.eventID = EventTriggerType.PointerEnter;
+            entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(c));});
+            trigger.triggers.Add(entryEnter);
+
+            EventTrigger.Entry entryExit = new EventTrigger.Entry();
+            entryExit.eventID = EventTriggerType.PointerExit;
+            entryExit.callback.AddListener((data)=>{HidePopUp();});
+            trigger.triggers.Add(entryExit);
 
             Button btn = cardObj.GetComponent<Button>();
 
             btn.onClick.AddListener(()=>OnClickCardHand(c,c.select));
         }
     }
-
-
     private void DrawField(Player targetPlayer, Transform fieldArea)
     {
         foreach(Transform child in fieldArea)
@@ -119,7 +255,20 @@ public class GameVisual : MonoBehaviour
 
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
-            btnText.text = $"Cost:{c.Cost}\n{c.GetType().Name}\nATK:{c.Attack} HP:{c.Hp}"; 
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+
+            EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
+            if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
+
+            EventTrigger.Entry entryEnter = new EventTrigger.Entry();
+            entryEnter.eventID = EventTriggerType.PointerEnter;
+            entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(c));});
+            trigger.triggers.Add(entryEnter);
+
+            EventTrigger.Entry entryExit = new EventTrigger.Entry();
+            entryExit.eventID = EventTriggerType.PointerExit;
+            entryExit.callback.AddListener((data)=>{HidePopUp();});
+            trigger.triggers.Add(entryExit);
 
             Button btn = cardObj.GetComponent<Button>();
 
@@ -153,7 +302,7 @@ public class GameVisual : MonoBehaviour
 
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
-            btnText.text = $"Cost:{c.Cost}\n{c.GetType().Name}\nATK:{c.Attack} HP:{c.Hp}"; 
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
 
             Button btn = cardObj.GetComponent<Button>();
 
@@ -341,7 +490,7 @@ public class GameVisual : MonoBehaviour
 
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
-            btnText.text = $"Cost:{c.Cost}\n{c.GetType().Name}\nATK:{c.Attack} HP:{c.Hp}"; 
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
 
             Button btn = cardObj.GetComponent<Button>();
 
@@ -370,6 +519,11 @@ public class GameVisual : MonoBehaviour
     public void OnSelfGarbageClicked()
     {
         if(gm.currentPhase != PhaseState.Start) return;
+        if(gm.turn.field.Count == 0)
+        {
+            DecideSelfGarbage();
+            return;
+        }
         SelectCard.SetActive(true);
         DrawSelectCardSelfGarbage();
     }
@@ -397,7 +551,7 @@ public class GameVisual : MonoBehaviour
 
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
-            btnText.text = $"Cost:{c.Cost}\n{c.GetType().Name}\nATK:{c.Attack} HP:{c.Hp}"; 
+            btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
 
             Button btn = cardObj.GetComponent<Button>();
 
@@ -407,8 +561,18 @@ public class GameVisual : MonoBehaviour
     List<Card> selfGarbageList = new List<Card>();
     private void AddSelfGarbage(Card c,GameObject obj)
     {
+        Image img = obj.GetComponent<Image>();
+        if (selfGarbageList.Contains(c))
+        {
+            selfGarbageList.Remove(c);        
+            img.color = Color.white;
+        }
+        else
+        {
+            selfGarbageList.Add(c); 
+            img.color = Color.gray;
+        }
         selfGarbageList.Add(c);
-        Destroy(obj);
     }
     private void DecideSelfGarbage()
     {
@@ -441,5 +605,48 @@ public class GameVisual : MonoBehaviour
             }
         }
         return deck;
+    }
+    private string GetCardName(Card c)
+    {
+        string className = c.GetType().Name;
+        string displayName = className;
+        if(cardDatabase != null)
+        {
+            foreach(CardSetting name in cardDatabase.cards)
+            {
+                if(name.className == className)
+                {
+                    displayName = name.displayName;
+                    break;
+                }
+            }
+        }
+        return displayName;
+    }
+    private string GetCardAbility(Card c)
+    {
+        string className = c.GetType().Name;
+        string ability = "なし";
+        if(cardDatabase != null)
+        {
+            foreach(CardSetting name in cardDatabase.cards)
+            {
+                if(name.className == className)
+                {
+                    ability = name.ability;
+                    break;
+                }
+            }
+        }
+        return ability;
+    }
+    public void ShowPopUp(string abilityText)
+    {
+        cardPopupText.text = abilityText;
+        cardPopupPanel.SetActive(true);
+    }
+    public void HidePopUp()
+    {
+        cardPopupPanel.SetActive(false);
     }
 }

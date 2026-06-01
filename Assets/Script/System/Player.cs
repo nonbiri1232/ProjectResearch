@@ -24,6 +24,18 @@ public class Player
             c.player = this;
         }
     }
+    public void Marigan(List<Card> cards)
+    {
+        Draw(cards.Count);
+        Debug.Log($"{cards.Count}枚マリガンしました");
+        foreach(var c in cards)
+        {
+            hand.Remove(c);
+            deck.Add(c);
+            Debug.Log($"{c}をデッキに戻しました");
+        }
+        Shuffle();
+    }
     public void DirectAttack(Player enemy,Card attacker)
     {
         maxMemory += attacker.Attack;
