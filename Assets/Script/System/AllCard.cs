@@ -209,15 +209,6 @@ public class UnSafeArea : Card
             target.isImmediate = true;
         }
     }
-
-    public override bool AddCost(Player Enemy, List<Card> target = null)
-    {
-        if(player.field.Count >= 3)
-        {
-            return true;
-        }
-        return false;
-    }
 }
 
 public class Master : Card

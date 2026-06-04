@@ -8,6 +8,8 @@ using Unity.VisualScripting;
 using UnityEngine.Timeline;
 using UnityEngine.Experimental.AI;
 using UnityEngine.EventSystems;
+using UnityEditor;
+using UnityEditor.Experimental.GraphView;
 
 public class GameVisual : MonoBehaviour
 {
@@ -28,13 +30,15 @@ public class GameVisual : MonoBehaviour
     public Transform p2FieldArea;
 
     [Header("Prefabs")]
-    public GameObject cardButtonPrefab; 
+    public GameObject cardButtonPrefab;
+    [Header("DrawField")] 
     public GameObject witchPlay;
     public GameObject witchPlaySelect;
     public GameObject SelectCard;
     public GameObject MariganField;
     public GameObject MariganFieldPlayer1;
     public GameObject MariganFieldPlayer2;
+    public GameObject ScopeArea;
     [Header("Card DBS")]
     public CardConect cardDatabase;
     [Header("Card PopUp")]
@@ -210,6 +214,32 @@ public class GameVisual : MonoBehaviour
         DrawField(player1, p1FieldArea);
         DrawField(player2, p2FieldArea);
     }
+    private void DrawScope()
+    {
+        Transform trs = ScopeArea.GetComponent<Transform>();
+        foreach (Transform child in trs)
+        {
+            Destroy(child.gameObject);
+        }
+        Card c = gm.currentScope;
+        GameObject cardObj = Instantiate(cardButtonPrefab, trs);
+        TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
+            
+        btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}"; 
+
+        EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
+        if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
+
+        EventTrigger.Entry entryEnter = new EventTrigger.Entry();
+        entryEnter.eventID = EventTriggerType.PointerEnter;
+        entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(c));});
+        trigger.triggers.Add(entryEnter);
+
+        EventTrigger.Entry entryExit = new EventTrigger.Entry();
+        entryExit.eventID = EventTriggerType.PointerExit;
+        entryExit.callback.AddListener((data)=>{HidePopUp();});
+        trigger.triggers.Add(entryExit);
+    }
     private void DrawHand(Player targetPlayer, Transform handArea)
     {
         foreach (Transform child in handArea)
@@ -318,6 +348,7 @@ public class GameVisual : MonoBehaviour
             selectedPlayCard = c;
             if(c.Type == Card.CardType.Object)
             {
+                Debug.Log($"オブジェクトがプレイされました。");
                 if(select.whereTarget == where.hand)
                 {
                     DrawSelectCard(select);
@@ -348,6 +379,7 @@ public class GameVisual : MonoBehaviour
             }
             else if(c.Type == Card.CardType.Method)
             {
+                Debug.Log($"メソッドがプレイされました。");
                 if(select.whereTarget == where.hand)
                 {
                     SelectCard.SetActive(true);
@@ -363,8 +395,9 @@ public class GameVisual : MonoBehaviour
                     PlayAction(false);
                 }
             }
-            else
+            else if(c.Type == Card.CardType.Scope)
             {
+                Debug.Log($"スコープがプレイされました。");
                 PlayAction(false);
             }
             
@@ -408,7 +441,12 @@ public class GameVisual : MonoBehaviour
 
         if (isCorrect)
         {
+            Debug.Log($"正常にカードがプレイされました。");
             UpdateUI();
+        }
+        else
+        {
+            Debug.Log($"カードプレイが何らかの要因で失敗しました。");
         }
     }
     public void PlayAction(bool isAddCost)
@@ -425,7 +463,12 @@ public class GameVisual : MonoBehaviour
 
         if (isCorrect)
         {
+            Debug.Log($"正常にカードがプレイされました。");            
             UpdateUI();
+        }
+        else
+        {
+            Debug.Log($"カードプレイが何らかの要因で失敗しました。");
         }
     }
     public void CancelPlay()
@@ -572,7 +615,6 @@ public class GameVisual : MonoBehaviour
             selfGarbageList.Add(c); 
             img.color = Color.gray;
         }
-        selfGarbageList.Add(c);
     }
     private void DecideSelfGarbage()
     {
@@ -583,6 +625,7 @@ public class GameVisual : MonoBehaviour
         selfGarbageList.Clear();
         if (isCorrect)
         {
+            Debug.Log($"セルフガベージが実行されました。");
             UpdateUI();
         }
     }
