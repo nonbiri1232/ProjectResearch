@@ -459,6 +459,3 @@ public class AllDelete : Card
         player.DestoryField(Enemy,allDelete);
     }
 }
-
-
-
