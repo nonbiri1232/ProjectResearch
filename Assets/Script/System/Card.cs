@@ -85,6 +85,7 @@ public class Card
 
     protected Card RandomSelect(List<Card> target)
     {
+        if(target == null)return null;
         int size = target.Count;
         int rnd = Random.Range(0,size);
         return target[rnd];

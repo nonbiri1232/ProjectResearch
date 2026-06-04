@@ -176,6 +176,7 @@ public class Player
         usedMemory += c.Cost;
         if(c.Type == Card.CardType.Scope)
         {
+            hand.Remove(c);
             gm.currentScope = c;
         }
         else

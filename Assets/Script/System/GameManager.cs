@@ -285,7 +285,7 @@ public class GameManager
         //プレイできるかを確認
         if (action.isAddCost)
         {
-             if(move.fieldCost + action.sourceCard.Cost + 1 > move.maxMemory || move.usedMemory + action.sourceCard.Cost + 1 > move.usableMemory) return false;
+            if(move.fieldCost + action.sourceCard.Cost + 1 > move.maxMemory || move.usedMemory + action.sourceCard.Cost + 1 > move.usableMemory) return false;
             if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
             if(!action.sourceCard.AddCost(wait)) return false;
         }else{
@@ -323,6 +323,11 @@ public class GameManager
     public bool Attack(Player move,Player wait,PlayerAction action)
     {
         var source = action.sourceCard;
+        if(source.Type != Card.CardType.Object)
+        {
+            Debug.Log($"これはオブジェクトではありません。");
+            return false;
+        }
         if (!source.isCanAttack)
         {
             Debug.Log($"何かしらの効果によってこのカードは攻撃できません");
