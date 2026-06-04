@@ -63,10 +63,17 @@ public class GameVisual : MonoBehaviour
         new Paging(),new Paging(),new Paging(),new Paging(),new BackGroundMiner(),
         new SystemFreeze(),new CarnelPanicZero(),new AllDelete()
     }; 
+    List<Card> deck2 = new List<Card>(){
+        new SledOverClock(),new SledOverClock(),new SledOverClock(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),
+        new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ParallelCompilation(),
+        new PoisonPoint(),new PoisonPoint(),new PoisonPoint(),new UnSafeArea(),new Master(),new Raid10(),new RmRf(),
+        new Paging(),new Paging(),new Paging(),new Paging(),new BackGroundMiner(),
+        new SystemFreeze(),new CarnelPanicZero(),new AllDelete()
+    }; 
     void Start()
     {
         player1 = new Player(deck);
-        player2 = new Player(CreateBasicCardDeck());
+        player2 = new Player(deck2);
 
         gm = new GameManager(player1, player2);
 

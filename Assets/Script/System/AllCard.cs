@@ -440,6 +440,7 @@ public class CarnelPanicZero : Card
             List<Card> targetList = new List<Card>(Enemy.field);
             player.DestoryField(Enemy, targetList);
         }
+        this.Constructor(Enemy ,target);
     }
 }
 public class AllDelete : Card
