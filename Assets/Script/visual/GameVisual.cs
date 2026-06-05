@@ -1,6 +1,6 @@
 using UnityEngine;
-using UnityEngine.UI; // Buttonを使うために必要です
-using TMPro; // 【追加】TextMeshProを使うための宣言
+using UnityEngine.UI;
+using TMPro;
 using System.Collections.Generic;
 using NUnit.Framework.Constraints;
 using UnityEngine.Assemblies;
@@ -60,24 +60,22 @@ public class GameVisual : MonoBehaviour
         SelectCard.SetActive(true);
     }
 
-    List<Card> deck = new List<Card>(){
-        new SledOverClock(),new SledOverClock(),new SledOverClock(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),
-        new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ParallelCompilation(),
-        new PoisonPoint(),new PoisonPoint(),new PoisonPoint(),new UnSafeArea(),new Master(),new Raid10(),new RmRf(),
-        new Paging(),new Paging(),new Paging(),new Paging(),new BackGroundMiner(),
-        new SystemFreeze(),new CarnelPanicZero(),new AllDelete()
-    }; 
-    List<Card> deck2 = new List<Card>(){
-        new SledOverClock(),new SledOverClock(),new SledOverClock(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),new IncrementProcess(),
-        new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ClockDownBot(),new ParallelCompilation(),
-        new PoisonPoint(),new PoisonPoint(),new PoisonPoint(),new UnSafeArea(),new Master(),new Raid10(),new RmRf(),
-        new Paging(),new Paging(),new Paging(),new Paging(),new BackGroundMiner(),
-        new SystemFreeze(),new CarnelPanicZero(),new AllDelete()
-    }; 
+    List<Card> player1Deck = new List<Card>();
+    
+    List<Card> player2Deck = new List<Card>();
     void Start()
     {
-        player1 = new Player(deck);
-        player2 = new Player(deck2);
+        foreach(string className in DeckManager.player1Deck)
+        {
+            player1Deck.Add(DeckManager.CreateCardInstance(className));
+        }
+        foreach(string className in DeckManager.player2Deck)
+        {
+            player2Deck.Add(DeckManager.CreateCardInstance(className));
+        }
+
+        player1 = new Player(player1Deck);
+        player2 = new Player(player2Deck);
 
         gm = new GameManager(player1, player2);
 
@@ -642,20 +640,6 @@ public class GameVisual : MonoBehaviour
         return gm.turn == player1 ? player2 : player1;
     }
 
-    private List<Card> CreateBasicCardDeck()
-    {
-        List<Card> deck = new List<Card>();
-        for (int i = 1; i < 11; i++)
-        {
-            for(int j = 0;j < 4; j++)
-            {
-                Card c = new Card();
-                c.SettingBasicCard(i);
-                deck.Add(c);
-            }
-        }
-        return deck;
-    }
     private string GetCardName(Card c)
     {
         string className = c.GetType().Name;
