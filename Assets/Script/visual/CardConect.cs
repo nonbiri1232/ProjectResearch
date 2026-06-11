@@ -11,7 +11,7 @@ public class CardSetting
     public int hp;
     public string displayName;
     public string ability;
-    public Image cardImage;
+    public Sprite cardImage;
 
 }
 [CreateAssetMenu(fileName = "CardConect", menuName = "Scriptable Objects/CardConect")]

@@ -245,6 +245,8 @@ public class Master : Card
             c2.ChangeCost -= c2.Cost;
             c1.Cost = 0;
             c2.Cost = 0;
+            c1.isImmediate = true;
+            c2.isImmediate = true;
             var action1 = new PlayerAction(ActionType.Play,c1);
             var action2 = new PlayerAction(ActionType.Play,c2);
             player.gm.Play(player,Enemy,action1);
@@ -255,6 +257,7 @@ public class Master : Card
             var c1 = randaomCard[0];
             c1.ChangeCost -= c1.Cost;
             c1.Cost = 0;
+            c1.isImmediate = true;
             var action1 = new PlayerAction(ActionType.Play,c1);
             player.gm.Play(player,Enemy,action1);
         }

@@ -21,7 +21,7 @@ public class CreateDeckVisual : MonoBehaviour
     [Header("Card PopUp")]
     public GameObject cardPopupPanel;
     public TextMeshProUGUI cardPopupText;
-    private byte nowChangeDeck = 1;
+    private int nowChangeDeck = 1;
 
     private List<string> allAvailableCards = new List<string>()
     {
@@ -32,12 +32,15 @@ public class CreateDeckVisual : MonoBehaviour
 
     void Start()
     {
+        DeckManager.LoadDeck();
         UpdateUI();
     }
 
-    public void SelectChangeDeck(byte i)
+    public void SelectChangeDeck(int i)
     {
+        Debug.Log($"player{i}に変更しました。");
         nowChangeDeck = i;
+        UpdateUI();
     }
     private List<string> ChangeDeck()
     {
@@ -59,6 +62,10 @@ public class CreateDeckVisual : MonoBehaviour
         else if(nowChangeDeck == 2)
         {
             deckSizeText.text = $"Deck2: {DeckManager.player2Deck.Count} / {DeckManager.MAXDECKNUM}";
+        }
+        else
+        {
+            deckSizeText.text = "";
         }
         foreach(Transform child in cardPoolArea) Destroy(child.gameObject);
         foreach(string cardName in allAvailableCards)
