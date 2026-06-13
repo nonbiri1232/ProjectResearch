@@ -2,14 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
-using NUnit.Framework.Constraints;
-using UnityEngine.Assemblies;
-using Unity.VisualScripting;
-using UnityEngine.Timeline;
-using UnityEngine.Experimental.AI;
 using UnityEngine.EventSystems;
-using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 
 public class GameVisual : MonoBehaviour
 {
@@ -218,9 +211,14 @@ public class GameVisual : MonoBehaviour
         DrawHand(player2, p2HandArea);
         DrawField(player1, p1FieldArea);
         DrawField(player2, p2FieldArea);
+        DrawScope();
     }
     private void DrawScope()
     {
+        if(gm.currentScope == null)
+        {
+            return;
+        }
         Transform trs = ScopeArea.GetComponent<Transform>();
         foreach (Transform child in trs)
         {
