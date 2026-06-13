@@ -43,7 +43,18 @@ public class LocalConnect:MonoBehaviour
     }
     private void OnDestroy()
     {
-        Close();
+        isBroadcasting = false;
+        isSearching = false;
+
+        // 電波の道具だけはメモリリーク防止のために確実に壊す
+        if (broadcaster != null) { broadcaster.Close(); broadcaster = null; }
+        if (listener != null) { listener.Close(); listener = null; }
+
+        // 【超重要】ここで Shutdown() は絶対に呼ばない！！！（通信を維持したまま次のシーンへ行くため）
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+        }
     }
     private string GetLocalIPAddress()
     {
