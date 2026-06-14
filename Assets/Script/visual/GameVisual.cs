@@ -58,13 +58,13 @@ public class GameVisual : MonoBehaviour
     List<Card> player2Deck = new List<Card>();
     void Start()
     {
-        foreach(string className in DeckManager.player1Deck)
+        foreach(int cardId in DeckManager.player1Deck)
         {
-            player1Deck.Add(DeckManager.CreateCardInstance(className));
+            player1Deck.Add(DeckManager.CreateCardInstance(cardId));
         }
-        foreach(string className in DeckManager.player2Deck)
+        foreach(int cardId in DeckManager.player2Deck)
         {
-            player2Deck.Add(DeckManager.CreateCardInstance(className));
+            player2Deck.Add(DeckManager.CreateCardInstance(cardId));
         }
 
         player1 = new Player(player1Deck);

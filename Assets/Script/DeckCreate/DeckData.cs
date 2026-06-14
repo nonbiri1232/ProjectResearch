@@ -5,5 +5,5 @@ using UnityEngine;
 [Serializable]
 public class DeckData
 {
-    public List<string> deck = new List<string>();
+    public List<int> deck = new List<int>();
 }
