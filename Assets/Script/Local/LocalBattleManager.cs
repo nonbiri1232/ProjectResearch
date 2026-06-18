@@ -1,4 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using NUnit.Framework.Internal.Filters;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -10,14 +14,52 @@ public class LocalBattleManager:NetworkBehaviour
     private GameManager gm;
     private Player host;
     private Player client;
-    public void SendMyDeckToHost(int[] myDeckIds)
+    private Player first;
+    public override void OnNetworkSpawn()
     {
+        isDidMariganHost = false;
+        isDidMariganClient = false;
+        base.OnNetworkSpawn();
+        SubmitDeckServerRpc(DeckManager.player1Deck.ToArray());
+    }
+    public void PackageData(Player pl)
+    {
+        int[] selfHand = transCardId(pl.hand);
+        int[] selfField = transCardId(pl.field);
+        int[] selfMemory = new int[]{
+            pl.hand.Count,
+            pl.garbage.Count,
+            pl.maxMemory,
+            pl.fieldCost,
+            pl.usableMemory,
+            pl.usedMemory,
+            pl.deck.Count};
+        int[] enemyField = transCardId(GetEnemyPlayer(pl).field);
+        int[] enemyMemory = new int[]{
+            GetEnemyPlayer(pl).hand.Count,
+            GetEnemyPlayer(pl).garbage.Count,
+            GetEnemyPlayer(pl).maxMemory,
+            GetEnemyPlayer(pl).fieldCost,
+            GetEnemyPlayer(pl).usableMemory,
+            GetEnemyPlayer(pl).usedMemory,
+            GetEnemyPlayer(pl).deck.Count
+        };
+        int scope = GetCardId(gm.currentScope.GetType().Name);
+        ulong target;
+        if (pl == host)
+        {
+            target = NetworkManager.ServerClientId;
+        }
+        else
+        {
+            target = GetClientId();
+        }
         Debug.Log("ホストへ自分のデッキを送信します。");
-        SubmitDeckServerRpc(myDeckIds);
+        SendBoardDataToClient(target,selfHand,selfField,enemyField,selfMemory,enemyMemory,scope);
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void SubmitDeckServerRpc(int[] deckData ,ServerRpcParams rpcParams = default)
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    private void SubmitDeckServerRpc(int[] deckData ,RpcParams rpcParams = default)
     {
         ulong senderId = rpcParams.Receive.SenderClientId;
         List<Card> deck = ChangeCard(deckData);
@@ -32,6 +74,7 @@ public class LocalBattleManager:NetworkBehaviour
             GameStart();
         }
     }
+    //ゲーム開始用
     private void GameStart()
     {
         ulong hostId = NetworkManager.ServerClientId;
@@ -50,20 +93,32 @@ public class LocalBattleManager:NetworkBehaviour
         host = new Player(hostDeck);
         client = new Player(clientDeck);
 
-        Player first = SelectFirstPlayer();
+        first = SelectFirstPlayer();
+        Debug.Log("ゲームを開始します");
         gm = new GameManager(first,GetEnemyPlayer(first));
         
-        int[] hostHand = transCardId(host.hand);
-
+        PackageData(host);
+        PackageData(client);
     }
-    [ClientRpc]
-    private void SetupBoardClientRpc()
+    private void SendBoardDataToClient(ulong targetId, int[] myHand, int[] myField, int[] enemyField, int[] myMemory, int[] enemyMemory, int scope)
     {
+        RpcSendParams sendParams = new RpcSendParams { Target = RpcTarget.Single(targetId, RpcTargetUse.Temp) };
+        RpcParams rpcParams = new RpcParams { Send = sendParams };
         
+        SetupBoardClientRpc(myHand, myField, enemyField, myMemory, enemyMemory, scope, rpcParams);
+    }
+    [Rpc(SendTo.SpecifiedInParams)]
+    private void SetupBoardClientRpc(int[] selfHand,int[] selfField,int[] enemyField,int[] selfMemory,int[] enemyMemory,int scope,RpcParams rpcParams = default)
+    {
+        visualManager.SetupInitialBoard(selfHand,selfField,enemyField,selfMemory,enemyMemory,scope);
     }
     private int[] transCardId(List<Card> cards)
     {
-        int[] c = new int[2];
+        int[] c = new int[cards.Count];
+        for(int i = 0;i < cards.Count; i++)
+        {
+            c[i] = GetCardId(cards[i]);
+        }
         return c;   
     } 
     private Player SelectFirstPlayer()
@@ -76,6 +131,54 @@ public class LocalBattleManager:NetworkBehaviour
         }
         return host;
     }
+    //マリガン用
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void DecideMariganRpc(int[] target,RpcParams rpcParams = default)
+    {
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        ulong hostId = NetworkManager.ServerClientId;
+        if(senderId == hostId && !isDidMariganHost)
+        {
+            hostMarigan = target;
+            isDidMariganHost = true;
+        }
+        else if(senderId != hostId && !isDidMariganClient)
+        {
+            clientMarigan = target;
+            isDidMariganClient = true;
+        }
+        if(isDidMariganClient && isDidMariganHost)
+            MariganAction();
+    }
+    int[] hostMarigan;
+    int[] clientMarigan;
+    bool isDidMariganHost;
+    bool isDidMariganClient;
+    private void MariganAction()
+    {
+        PlayerAction hostAction = new PlayerAction(ActionType.Marigan,SearchCard(hostMarigan,host.hand));
+        PlayerAction clientAction = new PlayerAction(ActionType.Marigan,SearchCard(clientMarigan,client.hand));
+        Debug.Log($"{gm.systemTurn}が今のターン数");
+        bool isCorrect1 = gm.ExecuteAction(host,client,hostAction);
+        bool isCorrect2 = gm.ExecuteAction(client,host,clientAction);
+        
+        Debug.Log($"isCorrect1={isCorrect1} isCorrect2={isCorrect2}");
+        if (isCorrect1 && isCorrect2)
+        {
+            PackageData(host);
+            PackageData(client);
+            SendEndMariganClientRpc();
+            Debug.Log($"画面をアップデートします");
+        }
+    }
+    [Rpc(SendTo.Everyone)]
+    private void SendEndMariganClientRpc()
+    {
+        if (visualManager != null)
+        {
+            visualManager.EndMarigan();
+        }
+    }
     private Player GetEnemyPlayer()
     {
         return gm.turn == host ? client : host;
@@ -84,6 +187,7 @@ public class LocalBattleManager:NetworkBehaviour
     {
         return pl == host ? client : host;
     }
+    //カードIDからインスタンスを作成する。
     private static List<Card> ChangeCard(int[] deckData)
     {
         List<Card> deck = new List<Card>();
@@ -93,5 +197,118 @@ public class LocalBattleManager:NetworkBehaviour
             deck.Add(c);
         }
         return deck;
+    }
+    //指定された範囲からカードIdの一致するインスタンスを探す。
+    private static List<Card> SearchCard(int[] Ids,List<Card> cards)
+    {
+        List<int> lost = new List<int>();
+        List<Card> get = new List<Card>();
+        List<Card> target = cards.ToList();
+        foreach(int i in Ids)
+        {
+            string className = GetCardClassName(i);
+            if(className == null)
+            {
+                lost.Add(i);
+                continue;
+            }
+            foreach(Card c in target)
+            {
+                if(c.GetType().Name == className)
+                {
+                    get.Add(c);
+                    target.Remove(c);
+                    continue;
+                }
+            }
+        }
+        Debug.Log($"次のカードが見つかりませんでした。{lost.ToArray()}");
+        return get;
+    }
+
+    public static string GetCardClassName(int cardId)
+    {
+        switch (cardId)
+        {
+            case 0: return "SledOverClock";
+            case 1: return "IncrementProcess";
+            case 2: return "ClockDownBot";
+            case 3: return "ParallelCompilation";
+            case 4:return "PoisonPoint";
+            case 5: return "UnSafeArea";
+            case 6: return "Master";
+            case 7: return "Raid10";
+            case 8: return "RmRf";
+            case 9: return "Paging";
+            case 10: return "BackGroundMiner";
+            case 11: return "SystemFreeze";
+            case 12: return "CarnelPanicZero";
+            case 13: return "AllDelete";
+            default:
+                Debug.LogError($"未定義のカードIDです: {cardId}");
+                return null;
+        }
+    }
+    public static int GetCardId(string className)
+    {
+        switch (className)
+        {
+            case "SledOverClock": return 0;
+            case "IncrementProcess": return 1;
+            case "ClockDownBot": return 2;
+            case "ParallelCompilation": return 3;
+            case "PoisonPoint": return 4;
+            case "UnSafeArea": return 5;
+            case "Master": return 6;
+            case "Raid10": return 7;
+            case "RmRf": return 8;
+            case "Paging": return 9;
+            case "BackGroundMiner": return 10;
+            case "SystemFreeze": return 11;
+            case "CarnelPanicZero": return 12;
+            case "AllDelete": return 13;
+            default:
+                Debug.LogError($"未定義のカードクラス名です: {className}");
+                return -1;
+        }
+    }
+    public static int GetCardId(Card c)
+    {
+        string className = c.GetType().Name;
+        switch (className)
+        {
+            case "SledOverClock": return 0;
+            case "IncrementProcess": return 1;
+            case "ClockDownBot": return 2;
+            case "ParallelCompilation": return 3;
+            case "PoisonPoint": return 4;
+            case "UnSafeArea": return 5;
+            case "Master": return 6;
+            case "Raid10": return 7;
+            case "RmRf": return 8;
+            case "Paging": return 9;
+            case "BackGroundMiner": return 10;
+            case "SystemFreeze": return 11;
+            case "CarnelPanicZero": return 12;
+            case "AllDelete": return 13;
+            default:
+                Debug.LogError($"未定義のカードクラス名です: {className}");
+                return -1;
+        }
+    }
+    private ulong GetClientId()
+    {
+        // NetworkManager.ConnectedClientsIds には、現在繋がっている全員のIDが入っています
+        foreach (ulong id in NetworkManager.ConnectedClientsIds)
+        {
+            // もし「ホストのID（0）」じゃなければ、それがクライアントだ！
+            if (id != NetworkManager.ServerClientId)
+            {
+                return id; 
+            }
+        }
+
+        Debug.LogError("通信エラー：クライアントのIDが見つかりません！");
+        return 0; // 見つからなかった時の保険
     }
 }
