@@ -20,6 +20,9 @@ public class LocalBattleManager:NetworkBehaviour
         isDidMariganHost = false;
         isDidMariganClient = false;
         base.OnNetworkSpawn();
+
+        Debug.Log($"[調査1] 自分が送信する直前のデッキ: {string.Join(", ", DeckManager.player1Deck)}");
+        
         SubmitDeckServerRpc(DeckManager.player1Deck.ToArray());
     }
     public void PackageData(Player pl)
@@ -44,7 +47,11 @@ public class LocalBattleManager:NetworkBehaviour
             GetEnemyPlayer(pl).usedMemory,
             GetEnemyPlayer(pl).deck.Count
         };
-        int scope = GetCardId(gm.currentScope.GetType().Name);
+        int scope = -1;
+        if (gm.currentScope != null)
+        {
+            scope = GetCardId(gm.currentScope);
+        }
         ulong target;
         if (pl == host)
         {
@@ -54,7 +61,13 @@ public class LocalBattleManager:NetworkBehaviour
         {
             target = GetClientId();
         }
-        Debug.Log("ホストへ自分のデッキを送信します。");
+        int[] hostHand = transCardId(host.hand);
+
+        // ★調査3を追加
+        if (IsServer) 
+        {
+            Debug.Log($"[調査3] 画面に描画されるホストの手札ID配列: {string.Join(", ", hostHand)}");
+        }
         SendBoardDataToClient(target,selfHand,selfField,enemyField,selfMemory,enemyMemory,scope);
     }
 
@@ -62,6 +75,7 @@ public class LocalBattleManager:NetworkBehaviour
     private void SubmitDeckServerRpc(int[] deckData ,RpcParams rpcParams = default)
     {
         ulong senderId = rpcParams.Receive.SenderClientId;
+        Debug.Log($"[調査2] プレイヤー {senderId} から受信したデッキ: {string.Join(", ", deckData)}");
         List<Card> deck = ChangeCard(deckData);
 
         receivedDecks[senderId] = deck;
@@ -88,8 +102,9 @@ public class LocalBattleManager:NetworkBehaviour
             }
         }
         List<Card> hostDeck = receivedDecks[hostId];
+        Debug.Log($"ホストのデッキ枚数{hostDeck.Count}");
         List<Card> clientDeck = receivedDecks[clientId];
-
+        Debug.Log($"クライアントのデッキ枚数{clientDeck.Count}");
         host = new Player(hostDeck);
         client = new Player(clientDeck);
 
@@ -218,7 +233,7 @@ public class LocalBattleManager:NetworkBehaviour
                 {
                     get.Add(c);
                     target.Remove(c);
-                    continue;
+                    break;
                 }
             }
         }

@@ -52,17 +52,20 @@ public class LocalBattleVisual : MonoBehaviour
     private int[] enemyMemory = new int[7];//上と同様
     private bool isMyTurn;
     private Card Scope;
+    private bool isMarigan;
     void Start()
     {
+        isMarigan = false;
         endTurnButton.onClick.AddListener(OnEndTurnClicked);
         //selfGarbageButton.onClick.AddListener(OnSelfGarbageClicked);
-
-        DrawMarigan();
-
-        UpdateUI();
     }
     public void UpdateUI()
     {
+        if (!isMarigan)
+        {
+            DrawMarigan();
+            isMarigan = true;
+        }
         DrawField();
     }
     public void SetupInitialBoard(int[] selfHand,int[] selfField,int[] enemyField,int[] selfMemory,int[] enemyMemory,int currentScope)
@@ -72,7 +75,8 @@ public class LocalBattleVisual : MonoBehaviour
         this.enemyField = ChangeCard(enemyField);
         this.selfMemory = selfMemory;
         this.enemyMemory = enemyMemory;
-        Scope = DeckManager.CreateCardInstance(currentScope);
+        if(currentScope != -1)
+            Scope = DeckManager.CreateCardInstance(currentScope);
         UpdateUI();
     }
     //マリガン用関数

@@ -3886,6 +3886,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad07583ddcfa85c4f8a9ae3361b823d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalBattleVisual
+  endTurnButton: {fileID: 1898606384}
+  selfGarbageButton: {fileID: 633046047}
+  systemText: {fileID: 0}
+  p1MemoryText: {fileID: 529084962}
+  p1HandArea: {fileID: 1865402577}
+  p1FieldArea: {fileID: 799009527}
+  p2MemoryText: {fileID: 1814485671}
+  p2FieldArea: {fileID: 134706109}
+  cardButtonPrefab: {fileID: 643482359281052992, guid: 83aceee82d3e45448993dab395ca6f71, type: 3}
+  witchPlay: {fileID: 431253077}
+  witchPlaySelect: {fileID: 1454603951}
+  SelectCard: {fileID: 170946418}
+  MariganField: {fileID: 296388078}
+  MariganFieldPlayer1: {fileID: 1132955181}
+  ScopeArea: {fileID: 1384158755}
+  cardDatabase: {fileID: 11400000, guid: a3d1415bced2b2e478d4209f3643a649, type: 2}
+  cardPopupPanel: {fileID: 1350621623}
+  cardPopupText: {fileID: 2122215410}
+  battleManager: {fileID: 1592393831}
 --- !u!4 &1876545859
 Transform:
   m_ObjectHideFlags: 0
