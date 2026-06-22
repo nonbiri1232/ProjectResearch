@@ -58,6 +58,8 @@ public class GameVisual : MonoBehaviour
     List<Card> player2Deck = new List<Card>();
     void Start()
     {
+        
+        MariganField.SetActive(true);
         foreach(int cardId in DeckManager.player1Deck)
         {
             player1Deck.Add(DeckManager.CreateCardInstance(cardId));
