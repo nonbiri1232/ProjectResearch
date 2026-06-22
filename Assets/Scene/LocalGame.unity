@@ -3294,6 +3294,78 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1588586219}
   m_CullTransparentMesh: 1
+--- !u!1 &1592393829
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1592393832}
+  - component: {fileID: 1592393830}
+  - component: {fileID: 1592393831}
+  m_Layer: 0
+  m_Name: LocalBattleManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1592393830
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592393829}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 2216229388
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 0
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
+--- !u!114 &1592393831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592393829}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53dbf6547a513ec489aeb6a9cb612c16, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalBattleManager
+  ShowTopMostFoldoutHeaderGroup: 1
+  visualManager: {fileID: 1876545858}
+--- !u!4 &1592393832
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592393829}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 996.3943, y: 510.85892, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1676378594
 GameObject:
   m_ObjectHideFlags: 0
@@ -3785,6 +3857,69 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1865402576}
   m_CullTransparentMesh: 1
+--- !u!1 &1876545857
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1876545859}
+  - component: {fileID: 1876545858}
+  m_Layer: 0
+  m_Name: LocalBattleVisual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1876545858
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1876545857}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad07583ddcfa85c4f8a9ae3361b823d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalBattleVisual
+  endTurnButton: {fileID: 1898606384}
+  selfGarbageButton: {fileID: 633046047}
+  systemText: {fileID: 0}
+  p1MemoryText: {fileID: 529084962}
+  p1HandArea: {fileID: 1865402577}
+  p1FieldArea: {fileID: 799009527}
+  p2MemoryText: {fileID: 1814485671}
+  p2FieldArea: {fileID: 134706109}
+  cardButtonPrefab: {fileID: 643482359281052992, guid: 83aceee82d3e45448993dab395ca6f71, type: 3}
+  witchPlay: {fileID: 431253077}
+  witchPlaySelect: {fileID: 1454603951}
+  SelectCard: {fileID: 170946418}
+  MariganField: {fileID: 296388078}
+  MariganFieldPlayer1: {fileID: 1132955181}
+  ScopeArea: {fileID: 1384158755}
+  cardDatabase: {fileID: 11400000, guid: a3d1415bced2b2e478d4209f3643a649, type: 2}
+  cardPopupPanel: {fileID: 1350621623}
+  cardPopupText: {fileID: 2122215410}
+  battleManager: {fileID: 1592393831}
+--- !u!4 &1876545859
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1876545857}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 996.3943, y: 510.85892, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1898606380
 GameObject:
   m_ObjectHideFlags: 0
@@ -4187,3 +4322,5 @@ SceneRoots:
   - {fileID: 957469788}
   - {fileID: 1676378595}
   - {fileID: 898024549}
+  - {fileID: 1876545859}
+  - {fileID: 1592393832}

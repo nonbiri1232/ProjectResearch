@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -23,12 +22,13 @@ public class CreateDeckVisual : MonoBehaviour
     public TextMeshProUGUI cardPopupText;
     private int nowChangeDeck = 1;
 
-    private List<string> allAvailableCards = new List<string>()
+    private readonly string[] idToClassName = new string[]
     {
         "SledOverClock", "IncrementProcess", "ClockDownBot", "ParallelCompilation",
         "PoisonPoint", "UnSafeArea", "Master", "Raid10", "RmRf", "Paging",
         "BackGroundMiner", "SystemFreeze", "CarnelPanicZero", "AllDelete"
     };
+    private List<int> allAvailableCards = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
 
     void Start()
     {
@@ -42,7 +42,7 @@ public class CreateDeckVisual : MonoBehaviour
         nowChangeDeck = i;
         UpdateUI();
     }
-    private List<string> ChangeDeck()
+    private List<int> ChangeDeck()
     {
         switch (nowChangeDeck)
         {
@@ -68,20 +68,20 @@ public class CreateDeckVisual : MonoBehaviour
             deckSizeText.text = "";
         }
         foreach(Transform child in cardPoolArea) Destroy(child.gameObject);
-        foreach(string cardName in allAvailableCards)
+        foreach(int cardId in allAvailableCards)
         {
             GameObject cardObj = Instantiate(cardButtonPrefab ,cardPoolArea,false);
 
             
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
-            btnText.text = $"Cost:{GetCardCost(cardName)}\n{GetCardName(cardName)}"; 
+            btnText.text = $"Cost:{GetCardCost(cardId)}\n{GetCardName(cardId)}"; 
 
             EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
             if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
 
             EventTrigger.Entry entryEnter = new EventTrigger.Entry();
             entryEnter.eventID = EventTriggerType.PointerEnter;
-            entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(cardName));});
+            entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(cardId));});
             trigger.triggers.Add(entryEnter);
 
             EventTrigger.Entry entryExit = new EventTrigger.Entry();
@@ -90,23 +90,23 @@ public class CreateDeckVisual : MonoBehaviour
             trigger.triggers.Add(entryExit);
             
             Button btn = cardObj.GetComponent<Button>();
-            btn.onClick.AddListener(() => AddToDeck(cardName));
+            btn.onClick.AddListener(() => AddToDeck(cardId));
         }
         foreach(Transform child in myDeckArea) Destroy(child.gameObject);
-        foreach(string cardName in ChangeDeck())
+        foreach(int cardId in ChangeDeck())
         {
             GameObject cardObj = Instantiate(cardButtonPrefab ,myDeckArea,false);
 
             
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
-            btnText.text = $"Cost:{GetCardCost(cardName)}\n{GetCardName(cardName)}"; 
+            btnText.text = $"Cost:{GetCardCost(cardId)}\n{GetCardName(cardId)}"; 
 
             EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
             if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
 
             EventTrigger.Entry entryEnter = new EventTrigger.Entry();
             entryEnter.eventID = EventTriggerType.PointerEnter;
-            entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(cardName));});
+            entryEnter.callback.AddListener((data)=>{ShowPopUp(GetCardAbility(cardId));});
             trigger.triggers.Add(entryEnter);
 
             EventTrigger.Entry entryExit = new EventTrigger.Entry();
@@ -115,107 +115,73 @@ public class CreateDeckVisual : MonoBehaviour
             trigger.triggers.Add(entryExit);
             
             Button btn = cardObj.GetComponent<Button>();
-            btn.onClick.AddListener(() => RemoveToDeck(cardName));
+            btn.onClick.AddListener(() => RemoveToDeck(cardId));
         }
 
     }
-    private void AddToDeck(string cardName)
+    private void AddToDeck(int cardId)
     {
-        DeckManager.AddDeck(nowChangeDeck,cardName);
+        DeckManager.AddDeck(nowChangeDeck,cardId);
         UpdateUI();
     }
-    private void RemoveToDeck(string cardName)
+    private void RemoveToDeck(int cardId)
     {
-        DeckManager.RemoveDeck(nowChangeDeck,cardName);
+        DeckManager.RemoveDeck(nowChangeDeck,cardId);
         UpdateUI();
+    }
+    private CardSetting GetCardSetting(int cardId)
+    {
+        if (cardDatabase != null && cardId >= 0 && cardId < idToClassName.Length)
+        {
+            string targetClassName = idToClassName[cardId];
+            
+            foreach (CardSetting setting in cardDatabase.cards)
+            {
+                if (setting.className == targetClassName)
+                {
+                    return setting;
+                }
+            }
+        }
+        return null;
+    }
+    private string GetCardName(int cardId)
+    {
+        CardSetting setting = GetCardSetting(cardId);
+        return setting != null ? setting.displayName : "Unknown";
     }
 
-    private string GetCardName(string className)
+    private string GetCardAbility(int cardId)
     {
-        string displayName = className;
-        if(cardDatabase != null)
-        {
-            foreach(CardSetting name in cardDatabase.cards)
-            {
-                if(name.className == className)
-                {
-                    displayName = name.displayName;
-                    break;
-                }
-            }
-        }
-        return displayName;
+        CardSetting setting = GetCardSetting(cardId);
+        return setting != null ? setting.ability : "なし";
     }
-    private string GetCardAbility(string className)
+
+    private int GetCardCost(int cardId)
     {
-        string ability = "なし";
-        if(cardDatabase != null)
-        {
-            foreach(CardSetting name in cardDatabase.cards)
-            {
-                if(name.className == className)
-                {
-                    ability = name.ability;
-                    break;
-                }
-            }
-        }
-        return ability;
+        CardSetting setting = GetCardSetting(cardId);
+        return setting != null ? setting.cost : 0;
     }
-    private int GetCardCost(string className)
+
+    private int GetCardAtk(int cardId)
     {
-        int cost = 0;
-        if(cardDatabase != null)
-        {
-            foreach(CardSetting name in cardDatabase.cards)
-            {
-                if(name.className == className)
-                {
-                    cost = name.cost;
-                    break;
-                }
-            }
-        }
-        return cost;
+        CardSetting setting = GetCardSetting(cardId);
+        return setting != null ? setting.atk : 0;
     }
-    private int GetCardAtk(string className)
+
+    private int GetCardHp(int cardId)
     {
-        int atk = 0;
-        if(cardDatabase != null)
-        {
-            foreach(CardSetting name in cardDatabase.cards)
-            {
-                if(name.className == className)
-                {
-                    atk = name.atk;
-                    break;
-                }
-            }
-        }
-        return atk;
+        CardSetting setting = GetCardSetting(cardId);
+        return setting != null ? setting.hp : 0;
     }
-    private int GetCardHp(string className)
-    {
-        int hp = 0;
-        if(cardDatabase != null)
-        {
-            foreach(CardSetting name in cardDatabase.cards)
-            {
-                if(name.className == className)
-                {
-                    hp = name.hp;
-                    break;
-                }
-            }
-        }
-        return hp;
-    }
+
     public void ShowPopUp(string abilityText)
     {
-        cardPopupText.text = abilityText;
+        if (cardPopupText != null) cardPopupText.text = abilityText;
     }
+
     public void HidePopUp()
     {
-        cardPopupText.text = null;
+        if (cardPopupText != null) cardPopupText.text = "";
     }
 }

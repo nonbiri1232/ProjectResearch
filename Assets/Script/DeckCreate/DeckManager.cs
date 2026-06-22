@@ -5,34 +5,34 @@ using UnityEngine;
 
 public class DeckManager
 {
-    public static List<string> player1Deck{get;private set;} = new List<string>();
-    public static List<string> player2Deck{get;private set;}= new List<string>();
+    public static List<int> player1Deck{get;private set;} = new List<int>();
+    public static List<int> player2Deck{get;private set;} = new List<int>();
     public const int MAXDECKNUM = 40;
     public const int MAXSAMECARD = 4;
-    public static void AddDeck(int wicthDeck,string className)
+    public static void AddDeck(int wicthDeck,int cardId)
     {
         switch (wicthDeck)
         {
             case 1:
                 if(player1Deck.Count >= MAXDECKNUM) break;
-                if(player1Deck.Count(f=>f==className) < MAXSAMECARD)player1Deck.Add(className);
+                if(player1Deck.Count(f=>f==cardId) < MAXSAMECARD)player1Deck.Add(cardId);
                 break;
             case 2:
                 if(player2Deck.Count >= MAXDECKNUM) break;
-                if(player2Deck.Count(f=>f==className) < MAXSAMECARD)player2Deck.Add(className);
+                if(player2Deck.Count(f=>f==cardId) < MAXSAMECARD)player2Deck.Add(cardId);
                 break;
         }
         SaveDeck();
     }
-    public static void RemoveDeck(int wicthDeck,string className)
+    public static void RemoveDeck(int wicthDeck,int cardId)
     {
         switch (wicthDeck)
         {
             case 1:
-                player1Deck.Remove(className);
+                player1Deck.Remove(cardId);
                 break;
             case 2:
-                player2Deck.Remove(className);
+                player2Deck.Remove(cardId);
                 break;
         }
         SaveDeck();
@@ -69,6 +69,12 @@ public class DeckManager
         }
         Debug.Log("保存されたデッキをロードしました");
     }
+    public static int[] GetDeckArrayForNetwork(int whichDeck)
+    {
+        List<int> targetDeck = (whichDeck == 1) ? player1Deck : player2Deck;
+        
+        return targetDeck.ToArray(); 
+    }
     
     public static Card CreateCardInstance(string className)
     {
@@ -90,6 +96,29 @@ public class DeckManager
             case "AllDelete": return new AllDelete();
             default:
                 Debug.LogError($"未定義のカードクラス名です: {className}");
+                return null;
+        }
+    }
+    public static Card CreateCardInstance(int cardId)
+    {
+        switch (cardId)
+        {
+            case 0: return new SledOverClock();
+            case 1: return new IncrementProcess();
+            case 2: return new ClockDownBot();
+            case 3: return new ParallelCompilation();
+            case 4:return new PoisonPoint();
+            case 5: return new UnSafeArea();
+            case 6: return new Master();
+            case 7: return new Raid10();
+            case 8: return new RmRf();
+            case 9: return new Paging();
+            case 10: return new BackGroundMiner();
+            case 11: return new SystemFreeze();
+            case 12: return new CarnelPanicZero();
+            case 13: return new AllDelete();
+            default:
+                Debug.LogError($"未定義のカードIDです: {cardId}");
                 return null;
         }
     }
