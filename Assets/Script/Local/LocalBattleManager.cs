@@ -32,22 +32,24 @@ public class LocalBattleManager:NetworkBehaviour
         base.OnNetworkSpawn();
         
         SubmitDeckServerRpc(DeckManager.player1Deck.ToArray());
+
+        // ターンが変わった時のUI更新
+        currentTurnPlayerId.OnValueChanged += (oldId, newId) => visualManager.UpdateUI();
+        
+        //フェイズが変わった時も自動で画面を更新する
+        currentPhaseState.OnValueChanged += (oldState, newState) => visualManager.UpdateUI();
     }
     private void Update()
     {
-        // ホストじゃなければ、またはゲームが始まっていなければ何もしない
         if (!IsServer || gm == null) return;
 
-        // 今のターンはホスト(0)か？クライアントか？をIDで判定
+        // ホスト（サーバー）だけがターンを監視して同期変数に書き込む
         ulong turnId = (gm.turn == host) ? NetworkManager.ServerClientId : GetClientId();
         
-        // もしターンが変わっていたら、共有変数を上書きする（自動でクライアントへ送信される）
         if (currentTurnPlayerId.Value != turnId)
         {
             currentTurnPlayerId.Value = turnId;
         }
-
-        // もしフェイズが変わっていたら、共有変数を上書きする
         if (currentPhaseState.Value != gm.currentPhase)
         {
             currentPhaseState.Value = gm.currentPhase;
