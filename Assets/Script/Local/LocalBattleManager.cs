@@ -154,12 +154,30 @@ public class LocalBattleManager:NetworkBehaviour
         host = new Player(hostDeck);
         client = new Player(clientDeck);
 
+        host.OnFailSafeTriggered += (card) => NotifyFailSafe(GetCardId(card));
+        client.OnFailSafeTriggered += (card) => NotifyFailSafe(GetCardId(card));
+
         first = SelectFirstPlayer();
         Debug.Log("ゲームを開始します");
         gm = new GameManager(first,GetEnemyPlayer(first));
         
         PackageData(host);
         PackageData(client);
+    }
+    private void NotifyFailSafe(int cardId)
+    {
+        PackageData(host);
+        PackageData(client);
+        NotifyFailSafeClientRpc(cardId);
+    }
+    [ClientRpc]
+    private void NotifyFailSafeClientRpc(int cardId)
+    {
+        // クライアント側で、指定されたIDからカード名を復元してポップアップを出す
+        string cardName = GetCardClassName(cardId);
+        Debug.Log($"【画面演出】フェイルセーフ発動！: {cardName}");
+
+
     }
     private void SendBoardDataToClient(ulong targetId, CardData[] myHand, CardData[] myField, CardData[] enemyField, int[] myMemory, int[] enemyMemory, int scope)
     {

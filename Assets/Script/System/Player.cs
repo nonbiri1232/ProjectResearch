@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Collections;
 using System.Linq;
 using Unity.VisualScripting;
+using System;
 
 public class Player
 {
@@ -17,6 +18,8 @@ public class Player
     public List<Card> garbage = new List<Card>();
     public List<Card> field = new List<Card>();
     public GameManager gm;
+
+    public event Action<Card> OnFailSafeTriggered;
     public Player(List<Card> Deck)
     {
         deck.AddRange(Deck);
@@ -46,14 +49,14 @@ public class Player
     private Card RandomSelect(List<Card> target)
     {
         int size = target.Count;
-        int rnd = Random.Range(0,size);
+        int rnd = UnityEngine.Random.Range(0,size);
         return target[rnd];
     }
 
     public void Shuffle()
     {
         for(var i = deck.Count - 1;i > 0;i--){
-            var j = Random.Range(0,i+1);
+            var j = UnityEngine.Random.Range(0,i+1);
             var temp = deck[i];
             deck[i] = deck[j];
             deck[j] = temp;
@@ -142,6 +145,7 @@ public class Player
             c.isSandBox = c.SandBox;
             c.isSegfault = c.Segfault;
 
+            OnFailSafeTriggered?.Invoke(c);
         }
         if (isStartPhase && target.Count > 0)
         {
