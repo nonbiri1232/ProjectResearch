@@ -324,11 +324,11 @@ public class LocalBattleVisual : MonoBehaviour
     }
     public void OpenAttackSelectUI(int fieldIndex)
     {
-        if(selectedAttackCard != selfField[fieldIndex])
+        /*if(selectedAttackCard != selfField[fieldIndex])
         {
             Debug.Log("インデックスと選択されたカードがずれています。");
             return;
-        }
+        }*/
         SelectCard.SetActive(true);
         if(enemyField.Count > 0)
         {

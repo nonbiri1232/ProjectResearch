@@ -163,6 +163,11 @@ public class LocalBattleManager:NetworkBehaviour
     }
     private void SendBoardDataToClient(ulong targetId, CardData[] myHand, CardData[] myField, CardData[] enemyField, int[] myMemory, int[] enemyMemory, int scope)
     {
+        if (targetId == NetworkManager.ServerClientId && IsServer)
+        {
+            visualManager.SetupInitialBoard(myHand, myField, enemyField, myMemory, enemyMemory, scope);
+            return;
+        }
         RpcSendParams sendParams = new RpcSendParams { Target = RpcTarget.Single(targetId, RpcTargetUse.Temp) };
         RpcParams rpcParams = new RpcParams { Send = sendParams };
         
