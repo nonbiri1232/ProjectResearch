@@ -6,6 +6,22 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
+public struct CardData : INetworkSerializable
+{
+    public int id;
+    public int cost;
+    public int atk;
+    public int hp;
+
+    // 通信で送るためのパッキング処理
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref id);
+        serializer.SerializeValue(ref cost);
+        serializer.SerializeValue(ref atk);
+        serializer.SerializeValue(ref hp);
+    }
+}
 public class LocalBattleManager:NetworkBehaviour
 {
     [Header("描画クラスへの参照")]
@@ -27,8 +43,8 @@ public class LocalBattleManager:NetworkBehaviour
     }
     public void PackageData(Player pl)
     {
-        int[] selfHand = transCardId(pl.hand);
-        int[] selfField = transCardId(pl.field);
+        CardData[] selfHand = transCardData(pl.hand);
+        CardData[] selfField = transCardData(pl.field);
         int[] selfMemory = new int[]{
             pl.hand.Count,
             pl.garbage.Count,
@@ -37,7 +53,7 @@ public class LocalBattleManager:NetworkBehaviour
             pl.usableMemory,
             pl.usedMemory,
             pl.deck.Count};
-        int[] enemyField = transCardId(GetEnemyPlayer(pl).field);
+        CardData[] enemyField = transCardData(GetEnemyPlayer(pl).field);
         int[] enemyMemory = new int[]{
             GetEnemyPlayer(pl).hand.Count,
             GetEnemyPlayer(pl).garbage.Count,
@@ -61,7 +77,7 @@ public class LocalBattleManager:NetworkBehaviour
         {
             target = GetClientId();
         }
-        int[] hostHand = transCardId(host.hand);
+        CardData[] hostHand = transCardData(host.hand);
 
         // ★調査3を追加
         if (IsServer) 
@@ -115,7 +131,7 @@ public class LocalBattleManager:NetworkBehaviour
         PackageData(host);
         PackageData(client);
     }
-    private void SendBoardDataToClient(ulong targetId, int[] myHand, int[] myField, int[] enemyField, int[] myMemory, int[] enemyMemory, int scope)
+    private void SendBoardDataToClient(ulong targetId, CardData[] myHand, CardData[] myField, CardData[] enemyField, int[] myMemory, int[] enemyMemory, int scope)
     {
         RpcSendParams sendParams = new RpcSendParams { Target = RpcTarget.Single(targetId, RpcTargetUse.Temp) };
         RpcParams rpcParams = new RpcParams { Send = sendParams };
@@ -123,19 +139,24 @@ public class LocalBattleManager:NetworkBehaviour
         SetupBoardClientRpc(myHand, myField, enemyField, myMemory, enemyMemory, scope, rpcParams);
     }
     [Rpc(SendTo.SpecifiedInParams)]
-    private void SetupBoardClientRpc(int[] selfHand,int[] selfField,int[] enemyField,int[] selfMemory,int[] enemyMemory,int scope,RpcParams rpcParams = default)
+    private void SetupBoardClientRpc(CardData[] selfHand, CardData[] selfField, CardData[] enemyField,int[] selfMemory,int[] enemyMemory,int scope,RpcParams rpcParams = default)
     {
         visualManager.SetupInitialBoard(selfHand,selfField,enemyField,selfMemory,enemyMemory,scope);
     }
-    private int[] transCardId(List<Card> cards)
+    private CardData[] transCardData(List<Card> cards)
     {
-        int[] c = new int[cards.Count];
-        for(int i = 0;i < cards.Count; i++)
+        CardData[] data = new CardData[cards.Count];
+        for(int i = 0; i < cards.Count; i++)
         {
-            c[i] = GetCardId(cards[i]);
+            data[i] = new CardData {
+                id = GetCardId(cards[i]),
+                cost = cards[i].Cost,
+                atk = cards[i].Attack,
+                hp = cards[i].Hp
+            };
         }
-        return c;   
-    } 
+        return data;   
+    }
     private Player SelectFirstPlayer()
     {
         int rnd = Random.Range(0,2);

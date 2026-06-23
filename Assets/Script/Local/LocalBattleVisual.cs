@@ -68,7 +68,7 @@ public class LocalBattleVisual : MonoBehaviour
         }
         DrawField();
     }
-    public void SetupInitialBoard(int[] selfHand,int[] selfField,int[] enemyField,int[] selfMemory,int[] enemyMemory,int currentScope)
+    public void SetupInitialBoard(CardData[] selfHand,CardData[] selfField,CardData[] enemyField,int[] selfMemory,int[] enemyMemory,int currentScope)
     {
         this.selfHand = ChangeCard(selfHand);
         this.selfField =  ChangeCard(selfField);
@@ -156,6 +156,20 @@ public class LocalBattleVisual : MonoBehaviour
         {
             Card c = DeckManager.CreateCardInstance(i);
             deck.Add(c);
+        }
+        return deck;
+    }
+    
+    private static List<Card> ChangeCard(CardData[] deckData)
+    {
+        List<Card> deck = new List<Card>();
+        foreach(CardData data in deckData)
+        {
+            Card c = DeckManager.CreateCardInstance(data.id);
+            deck.Add(c);
+            c.Attack = data.atk;
+            c.Hp = data.hp;
+            c.Cost = data.cost;
         }
         return deck;
     }
