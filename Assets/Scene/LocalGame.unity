@@ -555,8 +555,8 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: CancelPlay
         m_Mode: 1
         m_Arguments:
@@ -700,10 +700,10 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: PlayAction
-        m_Mode: 6
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -921,10 +921,10 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: PlayAction
-        m_Mode: 6
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -1994,8 +1994,8 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: isAdd
         m_Mode: 6
         m_Arguments:
@@ -2006,8 +2006,8 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 1
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: OpenSelectCard
         m_Mode: 1
         m_Arguments:
@@ -2151,8 +2151,8 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: isAdd
         m_Mode: 6
         m_Arguments:
@@ -2163,8 +2163,8 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: GameVisual, Assembly-CSharp
+      - m_Target: {fileID: 1876545858}
+        m_TargetAssemblyTypeName: LocalBattleVisual, Assembly-CSharp
         m_MethodName: OpenSelectCard
         m_Mode: 1
         m_Arguments:
@@ -3351,6 +3351,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LocalBattleManager
   ShowTopMostFoldoutHeaderGroup: 1
   visualManager: {fileID: 1876545858}
+  currentTurnPlayerId:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  currentPhaseState:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
 --- !u!4 &1592393832
 Transform:
   m_ObjectHideFlags: 0
@@ -3685,8 +3695,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 112d011d71a5b214a9fadbb0bb127de2, type: 2}
+  m_sharedMaterial: {fileID: 8094780874731112926, guid: 112d011d71a5b214a9fadbb0bb127de2, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -3888,7 +3898,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LocalBattleVisual
   endTurnButton: {fileID: 1898606384}
   selfGarbageButton: {fileID: 633046047}
-  systemText: {fileID: 0}
+  systemText: {fileID: 1816394132}
   p1MemoryText: {fileID: 529084962}
   p1HandArea: {fileID: 1865402577}
   p1FieldArea: {fileID: 799009527}

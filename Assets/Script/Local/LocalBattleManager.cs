@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Internal.Filters;
@@ -31,15 +32,44 @@ public class LocalBattleManager:NetworkBehaviour
     private Player host;
     private Player client;
     private Player first;
+
+    public NetworkVariable<ulong> currentTurnPlayerId = new NetworkVariable<ulong>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<PhaseState> currentPhaseState = new NetworkVariable<PhaseState>(
+        PhaseState.Start, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    public bool IsMyTurn => currentTurnPlayerId.Value == NetworkManager.LocalClientId;
+    public PhaseState CurrentPhase => currentPhaseState.Value;
     public override void OnNetworkSpawn()
     {
         isDidMariganHost = false;
         isDidMariganClient = false;
         base.OnNetworkSpawn();
-
-        Debug.Log($"[調査1] 自分が送信する直前のデッキ: {string.Join(", ", DeckManager.player1Deck)}");
         
         SubmitDeckServerRpc(DeckManager.player1Deck.ToArray());
+
+        // ターンが変わった時のUI更新
+        currentTurnPlayerId.OnValueChanged += (oldId, newId) => visualManager.UpdateUI();
+        
+        //フェイズが変わった時も自動で画面を更新する
+        currentPhaseState.OnValueChanged += (oldState, newState) => visualManager.UpdateUI();
+    }
+    private void Update()
+    {
+        if (!IsServer || gm == null) return;
+
+        // ホスト（サーバー）だけがターンを監視して同期変数に書き込む
+        ulong turnId = (gm.turn == host) ? NetworkManager.ServerClientId : GetClientId();
+        
+        if (currentTurnPlayerId.Value != turnId)
+        {
+            currentTurnPlayerId.Value = turnId;
+        }
+        if (currentPhaseState.Value != gm.currentPhase)
+        {
+            currentPhaseState.Value = gm.currentPhase;
+        }
     }
     public void PackageData(Player pl)
     {
@@ -215,9 +245,245 @@ public class LocalBattleManager:NetworkBehaviour
             visualManager.EndMarigan();
         }
     }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void GarbageActionRpc(int[] targetIndices, RpcParams rpcParams = default){
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        Player senderPlayer = (senderId == NetworkManager.ServerClientId) ? host : client;
+        if (gm.turn != senderPlayer)
+        {
+            Debug.LogWarning($"不正な操作：プレイヤー {senderId} がターン外にセルフガベージをしようとしました！");
+            return;
+        }
+        
+        List<Card> targetList = new List<Card>();
+        foreach(int index in targetIndices)
+        {
+            // 範囲外エラーを防ぐ安全チェック
+            if (index >= 0 && index < gm.turn.field.Count)
+            {
+                targetList.Add(gm.turn.field[index]);
+            }
+        }
+        var action = new PlayerAction(ActionType.SelfGarbage,targetList);
+        bool isCorrect;
+        isCorrect = gm.ExecuteAction(gm.turn,GetEnemyPlayer(),action);
+        if (isCorrect)
+        {
+            Debug.Log($"セルフガベージが実行されました。");
+            PackageData(host);
+            PackageData(client);
+        }
+    }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void PlayActionRpc(bool isAddCost,int playCardIndex, RpcParams rpcParams = default){
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        Player senderPlayer = (senderId == NetworkManager.ServerClientId) ? host : client;
+        
+        if (gm.turn != senderPlayer)
+        {
+            Debug.LogWarning($"不正な操作：プレイヤー {senderId} がターン外にカードをプレイしようとしました！");
+            return;
+        }
+
+        if (playCardIndex < 0 || playCardIndex >= gm.turn.hand.Count)
+        {
+            Debug.LogError("エラー：指定されたインデックスが手札の範囲外です。");
+            return;
+        }
+        Card playCard = gm.turn.hand[playCardIndex];
+        var action = new PlayerAction(ActionType.Play,playCard);
+        action.isAddCost = isAddCost;
+        if (isAddCost)
+        {
+            Debug.Log($"＋１コストでプレイします。");
+        }
+        bool isCorrect;
+        isCorrect = gm.ExecuteAction(gm.turn,GetEnemyPlayer(),action);
+
+        if (isCorrect)
+        {
+            Debug.Log($"正常にカードがプレイされました。");            
+            PackageData(host);
+            PackageData(client);
+        }
+        else
+        {
+            Debug.Log($"カードプレイが何らかの要因で失敗しました。");
+        }
+    }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void PlayActionSelectRpc(bool isAddCost,int playCardIndex, int[] targetIndices, where here,RpcParams rpcParams = default){
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        Player senderPlayer = (senderId == NetworkManager.ServerClientId) ? host : client;
+        
+        if (gm.turn != senderPlayer)
+        {
+            Debug.LogWarning($"不正な操作：プレイヤー {senderId} がターン外にカードをプレイしようとしました！");
+            return;
+        }
+
+        if (playCardIndex < 0 || playCardIndex >= gm.turn.hand.Count)
+        {
+            Debug.LogError("エラー：指定されたインデックスが手札の範囲外です。");
+            return;
+        }
+        Card playCard = gm.turn.hand[playCardIndex];
+        
+        List<Card> targetList = new List<Card>();
+        if (targetIndices != null && targetIndices.Length > 0)
+        {
+            List<Card> searchArea = null;
+
+            // どこからターゲットを探すか決定する
+            if (here == where.hand)
+            {
+                searchArea = gm.turn.hand;
+            }
+            else if (here == where.enemyField)
+            {
+                searchArea = GetEnemyPlayer().field;
+            }
+            else if (here == where.selfField)
+            {
+                searchArea = gm.turn.field;
+            }
+
+            // 指定されたインデックスのカードをリストに追加
+            if (searchArea != null)
+            {
+                foreach(int index in targetIndices)
+                {
+                    // 範囲外エラーを防ぐ安全チェック
+                    if (index >= 0 && index < searchArea.Count)
+                    {
+                        targetList.Add(searchArea[index]);
+                    }
+                }
+            }
+        }
+
+        var action = new PlayerAction(ActionType.Play,playCard, targetList);
+        action.isAddCost = isAddCost;
+        if (isAddCost)
+        {
+            Debug.Log($"＋１コストでプレイします。");
+        }
+        bool isCorrect;
+        isCorrect = gm.ExecuteAction(gm.turn,GetEnemyPlayer(),action);
+
+        if (isCorrect)
+        {
+            Debug.Log($"正常にカードがプレイされました。");            
+            PackageData(host);
+            PackageData(client);
+        }
+        else
+        {
+            Debug.Log($"カードプレイが何らかの要因で失敗しました。");
+        }
+    }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void AskCanAttackRpc(int attackerFieldIndex, RpcParams rpcParams = default)
+    {
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        Player senderPlayer = (senderId == NetworkManager.ServerClientId) ? host : client;
+
+        // 1. ターンチェック
+        if(gm.turn != senderPlayer) return;
+
+        // 2. 範囲チェック（エラー防止）
+        if(attackerFieldIndex < 0 || attackerFieldIndex >= senderPlayer.field.Count) return;
+
+        // 3. サーバー側にある「本物のカードデータ」を取得！！
+        Card realCard = senderPlayer.field[attackerFieldIndex];
+
+        // 4. 攻撃可能かどうかの判定（本物のデータでチェック）
+        if((!realCard.isImmediate && realCard.isFirstTurn) || !realCard.isCanAttack)
+        {
+            Debug.Log($"サーバー判定：プレイヤー {senderId} の {realCard.GetType().Name} は攻撃できません。");
+            return; // 攻撃不可ならここで処理を終了（何も返事をしない）
+        }
+
+        // 5. 攻撃可能なら、質問してきたクライアント「だけ」に返事をする！
+        ClientRpcParams replyParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { 
+                TargetClientIds = new ulong[] { senderId }
+            }
+        };
+        AllowAttackTargetClientRpc(attackerFieldIndex, replyParams);
+    }
+    [ClientRpc]
+    public void AllowAttackTargetClientRpc(int attackerFieldIndex, ClientRpcParams rpcParams = default)
+    {
+        Debug.Log("サーバーから攻撃の許可が降りました！ターゲット選択を開きます。");
+        
+        visualManager.OpenAttackSelectUI(attackerFieldIndex); 
+    }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void AttackActionRpc(int attackerIndex,int targetIndex,RpcParams rpcParams = default){
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        Player senderPlayer = (senderId == NetworkManager.ServerClientId) ? host : client;
+        
+        if (gm.turn != senderPlayer)
+        {
+            Debug.LogWarning($"不正な操作：プレイヤー {senderId} がターン外にカードを攻撃しようとしました！");
+            return;
+        }
+
+        if (attackerIndex < 0 || attackerIndex >= senderPlayer.field.Count) return;
+        Card attackerCard = senderPlayer.field[attackerIndex];
+        
+        PlayerAction action;
+
+        if (targetIndex == -1)
+        {
+            // ダイレクトアタック（ターゲット無しでPlayerActionを作成）
+            action = new PlayerAction(ActionType.Attack, attackerCard);
+        }
+        else
+        {
+            // 通常の攻撃（ターゲットの取得もインデックスで直接行う！）
+            if (targetIndex < 0 || targetIndex >= GetEnemyPlayer().field.Count) return;
+            Card targetCard = GetEnemyPlayer().field[targetIndex];
+            
+            action = new PlayerAction(ActionType.Attack, attackerCard, new List<Card> { targetCard });
+        }
+        bool isCorrect;
+        isCorrect = gm.ExecuteAction(gm.turn,GetEnemyPlayer(),action);
+
+        if (isCorrect)
+        {
+            Debug.Log($"攻撃処理が正常に処理されました。");
+            PackageData(host);
+            PackageData(client);
+            return;
+        }
+        Debug.Log($"何らかの要因によって攻撃処理が失敗しました。");
+    }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void TurnEndRpc(RpcParams rpcParams = default)
+    {
+        Debug.Log("サーバーでTurnEndRpcが受信されました!");
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        Player senderPlayer = (senderId == NetworkManager.ServerClientId) ? host : client;
+        if (gm.turn != senderPlayer)
+        {
+            Debug.LogWarning($"不正な操作：プレイヤー {senderId} がターン外にターンを終了しようとしました！");
+            return;
+        }
+        PlayerAction action = new PlayerAction();
+        action.type = ActionType.End;
+
+        bool isCorrect = gm.ExecuteAction(gm.turn, GetEnemyPlayer(), action);
+
+        Debug.Log("ターンを終了し、データを更新します。");
+        PackageData(host);
+        PackageData(client);
+    }    
     private Player GetEnemyPlayer()
     {
-        return gm.turn == host ? client : host;
+        return GetEnemyPlayer(gm.turn);
     }
     private Player GetEnemyPlayer(Player pl)
     {
