@@ -26,6 +26,13 @@ public class LocalConnect:MonoBehaviour
 
     private UdpClient broadcaster;
     private UdpClient listener;
+    private void Start()
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+    }
     public void Close()
     {
         isBroadcasting = false;

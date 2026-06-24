@@ -37,6 +37,9 @@ public class LocalBattleVisual : MonoBehaviour
     public TextMeshProUGUI cardPopupText;
     [Header("LocalBattleManager")]
     public LocalBattleManager battleManager;
+    [Header("End Game")]
+    public GameObject endGame;
+    public TextMeshProUGUI endText;
     //保持データ
     private List<Card> selfHand;
     private List<Card> selfField;
@@ -75,6 +78,24 @@ public class LocalBattleVisual : MonoBehaviour
         endTurnButton.onClick.AddListener(OnEndTurnClicked);
         selfGarbageButton.onClick.AddListener(OnSelfGarbageClicked);
         MariganField.SetActive(true);
+        endGame.SetActive(false);
+    }
+    public void EndGame(bool iswin)
+    {
+        endGame.SetActive(true);
+        if (iswin)
+        {
+            endText.text = "勝利";
+        }
+        else
+        {
+            endText.text = "敗北";
+        }
+    }
+    public void DrawGame()
+    {
+        endGame.SetActive(true);
+        endText.text = "引き分け";
     }
     public void OnSelfGarbageClicked()
     {
