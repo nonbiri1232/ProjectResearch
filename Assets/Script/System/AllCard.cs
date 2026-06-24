@@ -312,8 +312,11 @@ public class RmRf : Card
     public override void Destructor(Player Enemy, List<Card> target = null)
     {
         Card c = RandomSelect(Enemy.field);
-        List<Card> list = new List<Card>(){c};
-        player.DestoryField(Enemy,list);
+        if (c != null)
+        {
+            List<Card> list = new List<Card>(){c};
+            player.DestoryField(Enemy,list);
+        }
     }
 }
 public class Paging : Card
