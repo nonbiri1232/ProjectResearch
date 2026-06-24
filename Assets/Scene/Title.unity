@@ -4924,8 +4924,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: ShutDownGame, Assembly-CSharp
+      - m_Target: {fileID: 1895332154}
+        m_TargetAssemblyTypeName: TitleManager, Assembly-CSharp
         m_MethodName: ShutDown
         m_Mode: 1
         m_Arguments:
