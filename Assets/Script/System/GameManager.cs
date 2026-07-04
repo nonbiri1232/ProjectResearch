@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Linq;
 public enum GameState
 {
@@ -100,7 +99,6 @@ public class GameManager
 
     public void StartPhase(Player move,Player wait)
     {
-        Debug.Log("ターン開始");
         turn = move;
         currentPhase = PhaseState.Start;
         systemTurn++;
@@ -143,15 +141,11 @@ public class GameManager
 
     public void MainPhase(Player move,Player wait)
     {
-        
-        Debug.Log("メインフェイズ");
         currentPhase = PhaseState.Main;    
     }
 
     public void EndPhase(Player move,Player wait)
     {
-        
-        Debug.Log("エンドフェイズ");
         currentPhase = PhaseState.End;
         if(turn.field.Count > 0)
         {
@@ -208,7 +202,6 @@ public class GameManager
                     case ActionType.Marigan:
                         if(systemTurn == 1 && Didmarigan.Contains(move)){
                             move.Marigan(action.targetCard);
-                            Debug.Log($"マリガンを実行しました");
                             Didmarigan.Remove(move);
                             if(Didmarigan.Count == 0)
                             {    
@@ -275,8 +268,6 @@ public class GameManager
     {
         currentState = GameState.Finished;
         OnGameFinished?.Invoke(winner);
-
-        Debug.Log($"ゲーム終了！勝者は {(winner == player1 ? "Player1" : "Player2")} です！");
     }
 
     //実体化の処理
@@ -325,30 +316,25 @@ public class GameManager
         var source = action.sourceCard;
         if(source.Type != Card.CardType.Object)
         {
-            Debug.Log($"これはオブジェクトではありません。");
             return false;
         }
         if (!source.isCanAttack)
         {
-            Debug.Log($"何かしらの効果によってこのカードは攻撃できません");
             return false;
         }
         //出たばかりのターンか？
         if (source.isFirstTurn && !source.isImmediate)
         {
-            Debug.Log($"このカードは今出たターンです。");
             return false;
         }
         //このターンすでに攻撃しているか
         if (source.isAttacked >= source.attackTimes)
         {
-            Debug.Log($"このカードはすでに攻撃しています。");
             return false;
         }
         //直接攻撃できるか
         if(action.targetCard == null && wait.field.Count <= 0 && !source.isFirstTurn)
         {
-            Debug.Log($"ダイレクトアタックをします");
             move.DirectAttack(wait,action.sourceCard);
             source.isEncrypted = false;
             source.isAttacked++;
@@ -357,12 +343,10 @@ public class GameManager
         }
         if(action.targetCard == null && !source.isFirstTurn)
         {
-            Debug.Log($"このカードは今出たターンです。");
             return false;
         }
         if(action.targetCard == null && wait.field.Count >= 0)
         {
-            Debug.Log($"相手の場にオブジェクトが残っているのにダイレクトアタックをしようとしています。");
             return false;
         }
         List<Card> checkProxy = new List<Card>(wait.field);
@@ -376,7 +360,6 @@ public class GameManager
             {
                 if (c.isProxy)
                 {           
-                    Debug.Log($"場にプロキシがいるのに攻撃しようとしています。");
                     return false;
                 }
             }
@@ -384,7 +367,6 @@ public class GameManager
         //ターゲットが暗号化されているか
         if (target.isEncrypted)
         {
-            Debug.Log($"暗号化されているオブジェクトを攻撃しようとしています。");
             return false;
         }
 
@@ -411,7 +393,6 @@ public class GameManager
             }
             source.isEncrypted = false;
             source.isAttacked++;
-            Debug.Log($"攻撃時の能力によって対象が破壊されました。");
             return true;
         }
         //HPの増減処理
@@ -437,7 +418,6 @@ public class GameManager
         }
         source.isEncrypted = false;
         source.isAttacked++;
-        Debug.Log($"攻撃が正常に終了しました。");
         return true;
     }
 }

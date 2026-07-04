@@ -75,53 +75,6 @@ public class DeckManager
         
         return targetDeck.ToArray(); 
     }
-    
-    public static Card CreateCardInstance(string className)
-    {
-        switch (className)
-        {
-            case "SledOverClock": return new SledOverClock();
-            case "IncrementProcess": return new IncrementProcess();
-            case "ClockDownBot": return new ClockDownBot();
-            case "ParallelCompilation": return new ParallelCompilation();
-            case "PoisonPoint": return new PoisonPoint();
-            case "UnSafeArea": return new UnSafeArea();
-            case "Master": return new Master();
-            case "Raid10": return new Raid10();
-            case "RmRf": return new RmRf();
-            case "Paging": return new Paging();
-            case "BackGroundMiner": return new BackGroundMiner();
-            case "SystemFreeze": return new SystemFreeze();
-            case "CarnelPanicZero": return new CarnelPanicZero();
-            case "AllDelete": return new AllDelete();
-            default:
-                Debug.LogError($"未定義のカードクラス名です: {className}");
-                return null;
-        }
-    }
-    public static Card CreateCardInstance(int cardId)
-    {
-        switch (cardId)
-        {
-            case 0: return new SledOverClock();
-            case 1: return new IncrementProcess();
-            case 2: return new ClockDownBot();
-            case 3: return new ParallelCompilation();
-            case 4:return new PoisonPoint();
-            case 5: return new UnSafeArea();
-            case 6: return new Master();
-            case 7: return new Raid10();
-            case 8: return new RmRf();
-            case 9: return new Paging();
-            case 10: return new BackGroundMiner();
-            case 11: return new SystemFreeze();
-            case 12: return new CarnelPanicZero();
-            case 13: return new AllDelete();
-            default:
-                Debug.LogError($"未定義のカードIDです: {cardId}");
-                return null;
-        }
-    }
     public static List<Card> CreateBasicCardDeck()
     {
         List<Card> deck = new List<Card>();

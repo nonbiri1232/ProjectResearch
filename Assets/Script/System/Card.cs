@@ -1,6 +1,5 @@
+using System;
 using System.Collections.Generic;
-using NUnit.Framework;
-using UnityEngine;
 public enum where
 {
     None,
@@ -59,6 +58,7 @@ public class Card
     public int Attack{get; set;}
     public int ChangeHp = 0;
     public int Hp{get;set;}
+    private Random rand;
     public void OnPlay()
     {
         Daemon = isDaemon;
@@ -87,7 +87,7 @@ public class Card
     {
         if(target == null)return null;
         int size = target.Count;
-        int rnd = Random.Range(0,size);
+        int rnd = rand.Next(0,size);
         return target[rnd];
     }
 
@@ -98,5 +98,117 @@ public class Card
         Hp = i;
         Type = CardType.Object;
         select = new Select();
+    }
+
+    public static string GetCardClassName(int cardId)
+    {
+        switch (cardId)
+        {
+            case 0: return "SledOverClock";
+            case 1: return "IncrementProcess";
+            case 2: return "ClockDownBot";
+            case 3: return "ParallelCompilation";
+            case 4:return "PoisonPoint";
+            case 5: return "UnSafeArea";
+            case 6: return "Master";
+            case 7: return "Raid10";
+            case 8: return "RmRf";
+            case 9: return "Paging";
+            case 10: return "BackGroundMiner";
+            case 11: return "SystemFreeze";
+            case 12: return "CarnelPanicZero";
+            case 13: return "AllDelete";
+            default:
+                return null;
+        }
+    }
+    public static int GetCardId(string className)
+    {
+        switch (className)
+        {
+            case "SledOverClock": return 0;
+            case "IncrementProcess": return 1;
+            case "ClockDownBot": return 2;
+            case "ParallelCompilation": return 3;
+            case "PoisonPoint": return 4;
+            case "UnSafeArea": return 5;
+            case "Master": return 6;
+            case "Raid10": return 7;
+            case "RmRf": return 8;
+            case "Paging": return 9;
+            case "BackGroundMiner": return 10;
+            case "SystemFreeze": return 11;
+            case "CarnelPanicZero": return 12;
+            case "AllDelete": return 13;
+            default:
+                return -1;
+        }
+    }
+    public static int GetCardId(Card c)
+    {
+        string className = c.GetType().Name;
+        switch (className)
+        {
+            case "SledOverClock": return 0;
+            case "IncrementProcess": return 1;
+            case "ClockDownBot": return 2;
+            case "ParallelCompilation": return 3;
+            case "PoisonPoint": return 4;
+            case "UnSafeArea": return 5;
+            case "Master": return 6;
+            case "Raid10": return 7;
+            case "RmRf": return 8;
+            case "Paging": return 9;
+            case "BackGroundMiner": return 10;
+            case "SystemFreeze": return 11;
+            case "CarnelPanicZero": return 12;
+            case "AllDelete": return 13;
+            default:
+                return -1;
+        }
+    }
+    public static Card CreateCardInstance(string className)
+    {
+        switch (className)
+        {
+            case "SledOverClock": return new SledOverClock();
+            case "IncrementProcess": return new IncrementProcess();
+            case "ClockDownBot": return new ClockDownBot();
+            case "ParallelCompilation": return new ParallelCompilation();
+            case "PoisonPoint": return new PoisonPoint();
+            case "UnSafeArea": return new UnSafeArea();
+            case "Master": return new Master();
+            case "Raid10": return new Raid10();
+            case "RmRf": return new RmRf();
+            case "Paging": return new Paging();
+            case "BackGroundMiner": return new BackGroundMiner();
+            case "SystemFreeze": return new SystemFreeze();
+            case "CarnelPanicZero": return new CarnelPanicZero();
+            case "AllDelete": return new AllDelete();
+            default:
+                return null;
+        }
+    }
+    public static Card CreateCardInstance(int cardId)
+    {
+        switch (cardId)
+        {
+            case 0: return new SledOverClock();
+            case 1: return new IncrementProcess();
+            case 2: return new ClockDownBot();
+            case 3: return new ParallelCompilation();
+            case 4:return new PoisonPoint();
+            case 5: return new UnSafeArea();
+            case 6: return new Master();
+            case 7: return new Raid10();
+            case 8: return new RmRf();
+            case 9: return new Paging();
+            case 10: return new BackGroundMiner();
+            case 11: return new SystemFreeze();
+            case 12: return new CarnelPanicZero();
+            case 13: return new AllDelete();
+            default:
+                return null;
+        }
     }
 }

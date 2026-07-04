@@ -184,13 +184,13 @@ public class LocalBattleVisual : MonoBehaviour
     }
     public void SetupInitialBoard(CardData[] selfHand,CardData[] selfField,CardData[] enemyField,int[] selfMemory,int[] enemyMemory,int currentScope)
     {
-        this.selfHand = ChangeCard(selfHand);
-        this.selfField =  ChangeCard(selfField);
-        this.enemyField = ChangeCard(enemyField);
+        this.selfHand = Player.ChangeCard(selfHand);
+        this.selfField = Player.ChangeCard(selfField);
+        this.enemyField = Player.ChangeCard(enemyField);
         this.selfMemory = selfMemory;
         this.enemyMemory = enemyMemory;
         if(currentScope != -1)
-            Scope = DeckManager.CreateCardInstance(currentScope);
+            Scope = Card.CreateCardInstance(currentScope);
         UpdateUI();
     }
     //マリガン用関数
@@ -222,7 +222,7 @@ public class LocalBattleVisual : MonoBehaviour
 
             Button btn = cardObj.GetComponent<Button>();
 
-            btn.onClick.AddListener(()=>AddMarigan(LocalBattleManager.GetCardId(c),cardObj));
+            btn.onClick.AddListener(()=>AddMarigan(Card.GetCardId(c),cardObj));
         }
     }
     private void DecideMarigan(GameObject bt)
@@ -600,7 +600,7 @@ public class LocalBattleVisual : MonoBehaviour
         int[] c = new int[cards.Count];
         for(int i = 0;i < cards.Count; i++)
         {
-            c[i] = LocalBattleManager.GetCardId(cards[i]);
+            c[i] = Card.GetCardId(cards[i]);
         }
         return c;   
     } 
@@ -608,31 +608,8 @@ public class LocalBattleVisual : MonoBehaviour
     {
         if(select.whereTarget == where.selfField)return selfField;
         else return enemyField;
-    }
-    private static List<Card> ChangeCard(int[] deckData)
-    {
-        List<Card> deck = new List<Card>();
-        foreach(int i in deckData)
-        {
-            Card c = DeckManager.CreateCardInstance(i);
-            deck.Add(c);
-        }
-        return deck;
-    }
+    }    
     
-    private static List<Card> ChangeCard(CardData[] deckData)
-    {
-        List<Card> deck = new List<Card>();
-        foreach(CardData data in deckData)
-        {
-            Card c = DeckManager.CreateCardInstance(data.id);
-            deck.Add(c);
-            c.Attack = data.atk;
-            c.Hp = data.hp;
-            c.Cost = data.cost;
-        }
-        return deck;
-    }
     private string GetCardName(Card c)
     {
         string className = c.GetType().Name;

@@ -1,9 +1,4 @@
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using NUnit.Framework;
-using NUnit.Framework.Internal.Filters;
-using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -96,7 +91,7 @@ public class LocalBattleManager:NetworkBehaviour
         int scope = -1;
         if (gm.currentScope != null)
         {
-            scope = GetCardId(gm.currentScope);
+            scope = Card.GetCardId(gm.currentScope);
         }
         ulong target;
         if (pl == host)
@@ -122,7 +117,7 @@ public class LocalBattleManager:NetworkBehaviour
     {
         ulong senderId = rpcParams.Receive.SenderClientId;
         Debug.Log($"[調査2] プレイヤー {senderId} から受信したデッキ: {string.Join(", ", deckData)}");
-        List<Card> deck = ChangeCard(deckData);
+        List<Card> deck = Player.ChangeCard(deckData);
 
         receivedDecks[senderId] = deck;
         Debug.Log($"プレイヤー {senderId} のデッキを受信しました！ (現在の受信数: {receivedDecks.Count} / 2)");
@@ -154,8 +149,8 @@ public class LocalBattleManager:NetworkBehaviour
         host = new Player(hostDeck);
         client = new Player(clientDeck);
 
-        host.OnFailSafeTriggered += (card) => NotifyFailSafe(GetCardId(card));
-        client.OnFailSafeTriggered += (card) => NotifyFailSafe(GetCardId(card));
+        host.OnFailSafeTriggered += (card) => NotifyFailSafe(Card.GetCardId(card));
+        client.OnFailSafeTriggered += (card) => NotifyFailSafe(Card.GetCardId(card));
 
         first = SelectFirstPlayer();
         Debug.Log("ゲームを開始します");
@@ -174,7 +169,7 @@ public class LocalBattleManager:NetworkBehaviour
     private void NotifyFailSafeClientRpc(int cardId)
     {
         // クライアント側で、指定されたIDからカード名を復元してポップアップを出す
-        string cardName = GetCardClassName(cardId);
+        string cardName = Card.GetCardClassName(cardId);
         Debug.Log($"【画面演出】フェイルセーフ発動！: {cardName}");
 
 
@@ -202,7 +197,7 @@ public class LocalBattleManager:NetworkBehaviour
         for(int i = 0; i < cards.Count; i++)
         {
             data[i] = new CardData {
-                id = GetCardId(cards[i]),
+                id = Card.GetCardId(cards[i]),
                 cost = cards[i].Cost,
                 atk = cards[i].Attack,
                 hp = cards[i].Hp
@@ -245,8 +240,8 @@ public class LocalBattleManager:NetworkBehaviour
     bool isDidMariganClient;
     private void MariganAction()
     {
-        PlayerAction hostAction = new PlayerAction(ActionType.Marigan,SearchCard(hostMarigan,host.hand));
-        PlayerAction clientAction = new PlayerAction(ActionType.Marigan,SearchCard(clientMarigan,client.hand));
+        PlayerAction hostAction = new PlayerAction(ActionType.Marigan,Player.SearchCard(hostMarigan,host.hand));
+        PlayerAction clientAction = new PlayerAction(ActionType.Marigan,Player.SearchCard(clientMarigan,client.hand));
         Debug.Log($"{gm.systemTurn}が今のターン数");
         bool isCorrect1 = gm.ExecuteAction(host,client,hostAction);
         bool isCorrect2 = gm.ExecuteAction(client,host,clientAction);
@@ -417,14 +412,14 @@ public class LocalBattleManager:NetworkBehaviour
         // 2. 範囲チェック（エラー防止）
         if(attackerFieldIndex < 0 || attackerFieldIndex >= senderPlayer.field.Count) return;
 
-        // 3. サーバー側にある「本物のカードデータ」を取得！！
+        // 3. サーバー側にある本物のカードデータを取得
         Card realCard = senderPlayer.field[attackerFieldIndex];
 
-        // 4. 攻撃可能かどうかの判定（本物のデータでチェック）
+        // 4. 攻撃可能かどうかの判定
         if((!realCard.isImmediate && realCard.isFirstTurn) || !realCard.isCanAttack)
         {
             Debug.Log($"サーバー判定：プレイヤー {senderId} の {realCard.GetType().Name} は攻撃できません。");
-            return; // 攻撃不可ならここで処理を終了（何も返事をしない）
+            return; // 攻撃不可ならここで処理を終了
         }
 
         // 5. 攻撃可能なら、質問してきたクライアント「だけ」に返事をする！
@@ -511,115 +506,6 @@ public class LocalBattleManager:NetworkBehaviour
     private Player GetEnemyPlayer(Player pl)
     {
         return pl == host ? client : host;
-    }
-    //カードIDからインスタンスを作成する。
-    private static List<Card> ChangeCard(int[] deckData)
-    {
-        List<Card> deck = new List<Card>();
-        foreach(int i in deckData)
-        {
-            Card c = DeckManager.CreateCardInstance(i);
-            deck.Add(c);
-        }
-        return deck;
-    }
-    //指定された範囲からカードIdの一致するインスタンスを探す。
-    private static List<Card> SearchCard(int[] Ids,List<Card> cards)
-    {
-        List<int> lost = new List<int>();
-        List<Card> get = new List<Card>();
-        List<Card> target = cards.ToList();
-        foreach(int i in Ids)
-        {
-            string className = GetCardClassName(i);
-            if(className == null)
-            {
-                lost.Add(i);
-                continue;
-            }
-            foreach(Card c in target)
-            {
-                if(c.GetType().Name == className)
-                {
-                    get.Add(c);
-                    target.Remove(c);
-                    break;
-                }
-            }
-        }
-        Debug.Log($"次のカードが見つかりませんでした。{lost.ToArray()}");
-        return get;
-    }
-
-    public static string GetCardClassName(int cardId)
-    {
-        switch (cardId)
-        {
-            case 0: return "SledOverClock";
-            case 1: return "IncrementProcess";
-            case 2: return "ClockDownBot";
-            case 3: return "ParallelCompilation";
-            case 4:return "PoisonPoint";
-            case 5: return "UnSafeArea";
-            case 6: return "Master";
-            case 7: return "Raid10";
-            case 8: return "RmRf";
-            case 9: return "Paging";
-            case 10: return "BackGroundMiner";
-            case 11: return "SystemFreeze";
-            case 12: return "CarnelPanicZero";
-            case 13: return "AllDelete";
-            default:
-                Debug.LogError($"未定義のカードIDです: {cardId}");
-                return null;
-        }
-    }
-    public static int GetCardId(string className)
-    {
-        switch (className)
-        {
-            case "SledOverClock": return 0;
-            case "IncrementProcess": return 1;
-            case "ClockDownBot": return 2;
-            case "ParallelCompilation": return 3;
-            case "PoisonPoint": return 4;
-            case "UnSafeArea": return 5;
-            case "Master": return 6;
-            case "Raid10": return 7;
-            case "RmRf": return 8;
-            case "Paging": return 9;
-            case "BackGroundMiner": return 10;
-            case "SystemFreeze": return 11;
-            case "CarnelPanicZero": return 12;
-            case "AllDelete": return 13;
-            default:
-                Debug.LogError($"未定義のカードクラス名です: {className}");
-                return -1;
-        }
-    }
-    public static int GetCardId(Card c)
-    {
-        string className = c.GetType().Name;
-        switch (className)
-        {
-            case "SledOverClock": return 0;
-            case "IncrementProcess": return 1;
-            case "ClockDownBot": return 2;
-            case "ParallelCompilation": return 3;
-            case "PoisonPoint": return 4;
-            case "UnSafeArea": return 5;
-            case "Master": return 6;
-            case "Raid10": return 7;
-            case "RmRf": return 8;
-            case "Paging": return 9;
-            case "BackGroundMiner": return 10;
-            case "SystemFreeze": return 11;
-            case "CarnelPanicZero": return 12;
-            case "AllDelete": return 13;
-            default:
-                Debug.LogError($"未定義のカードクラス名です: {className}");
-                return -1;
-        }
     }
     private ulong GetClientId()
     {

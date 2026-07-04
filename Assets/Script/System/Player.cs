@@ -1,8 +1,5 @@
-using UnityEngine;
 using System.Collections.Generic;
-using Unity.Collections;
 using System.Linq;
-using Unity.VisualScripting;
 using System;
 
 public class Player
@@ -18,6 +15,7 @@ public class Player
     public List<Card> garbage = new List<Card>();
     public List<Card> field = new List<Card>();
     public GameManager gm;
+    public Random rand;
 
     public event Action<Card> OnFailSafeTriggered;
     public Player(List<Card> Deck)
@@ -27,16 +25,15 @@ public class Player
         {
             c.player = this;
         }
+        rand = new Random();
     }
     public void Marigan(List<Card> cards)
     {
         Draw(cards.Count);
-        Debug.Log($"{cards.Count}枚マリガンしました");
         foreach(var c in cards)
         {
             hand.Remove(c);
             deck.Add(c);
-            Debug.Log($"{c}をデッキに戻しました");
         }
         Shuffle();
     }
@@ -49,14 +46,14 @@ public class Player
     private Card RandomSelect(List<Card> target)
     {
         int size = target.Count;
-        int rnd = UnityEngine.Random.Range(0,size);
+        int rnd = rand.Next(0,size);
         return target[rnd];
     }
 
     public void Shuffle()
     {
         for(var i = deck.Count - 1;i > 0;i--){
-            var j = UnityEngine.Random.Range(0,i+1);
+            var j = rand.Next(0,i+1);
             var temp = deck[i];
             deck[i] = deck[j];
             deck[j] = temp;
@@ -162,7 +159,6 @@ public class Player
         c.Constructor(enemy);
         c.OnPlay();
         c.FailSafe(enemy);
-        Debug.Log($"フェイルセーフが発動しました。");
     }
 
     public void DrawG()
@@ -190,5 +186,56 @@ public class Player
             fieldCost += c.Cost;
             hand.Remove(c);
         }
-    }   
+    }  
+    //カードIDからインスタンスを作成する。
+    public static List<Card> ChangeCard(int[] deckData)
+    {
+        List<Card> deck = new List<Card>();
+        foreach(int i in deckData)
+        {
+            Card c = Card.CreateCardInstance(i);
+            deck.Add(c);
+        }
+        return deck;
+    }
+    public static List<Card> ChangeCard(CardData[] deckData)
+    {
+        List<Card> deck = new List<Card>();
+        foreach(CardData data in deckData)
+        {
+            Card c = Card.CreateCardInstance(data.id);
+            deck.Add(c);
+            c.Attack = data.atk;
+            c.Hp = data.hp;
+            c.Cost = data.cost;
+        }
+        return deck;
+    }
+    //指定された範囲からカードIdの一致するインスタンスを探す。
+    public static List<Card> SearchCard(int[] Ids,List<Card> cards)
+    {
+        List<int> lost = new List<int>();
+        List<Card> get = new List<Card>();
+        List<Card> target = cards.ToList();
+        foreach(int i in Ids)
+        {
+            string className = Card.GetCardClassName(i);
+            if(className == null)
+            {
+                lost.Add(i);
+                continue;
+            }
+            foreach(Card c in target)
+            {
+                if(c.GetType().Name == className)
+                {
+                    get.Add(c);
+                    target.Remove(c);
+                    break;
+                }
+            }
+        }
+        return get;
+    } 
+    
 }
