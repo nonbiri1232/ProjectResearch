@@ -65,11 +65,11 @@ public class GameVisual : MonoBehaviour
         MariganField.SetActive(true);
         foreach(int cardId in DeckManager.player1Deck)
         {
-            player1Deck.Add(DeckManager.CreateCardInstance(cardId));
+            player1Deck.Add(Card.CreateCardInstance(cardId));
         }
         foreach(int cardId in DeckManager.player2Deck)
         {
-            player2Deck.Add(DeckManager.CreateCardInstance(cardId));
+            player2Deck.Add(Card.CreateCardInstance(cardId));
         }
 
         player1 = new Player(player1Deck);

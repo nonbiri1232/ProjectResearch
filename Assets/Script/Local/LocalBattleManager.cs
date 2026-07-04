@@ -148,7 +148,6 @@ public class LocalBattleManager:NetworkBehaviour
         }
         CardData[] hostHand = transCardData(host.hand);
 
-        // ★調査3を追加
         if (IsServer) 
         {
             Debug.Log($"[調査3] 画面に描画されるホストの手札ID配列: {string.Join(", ", hostHand)}");
