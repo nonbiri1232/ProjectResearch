@@ -49,7 +49,51 @@ public class LocalBattleManager:NetworkBehaviour
         
         //フェイズが変わった時も自動で画面を更新する
         currentPhaseState.OnValueChanged += (oldState, newState) => visualManager.UpdateUI();
+
+        //通信状況を監視
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
     }
+    public override void OnNetworkDespawn()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnect;
+        }
+        base.OnNetworkDespawn();
+    }
+    private void OnClientDisconnect(ulong disconnectedClientId)
+    {
+        Debug.Log($"プレイヤー {disconnectedClientId} との通信が切断されました。");
+
+        // もしすでに「HPが0になってゲームが正常終了」している後なら、何もしない
+        if (gm != null && gm.currentState == GameState.Finished) return;
+
+        if (IsServer)
+        {
+            // 【自分がホストの場合】
+            if (disconnectedClientId != NetworkManager.ServerClientId)
+            {
+                Debug.Log("対戦相手（クライアント）が切断しました。あなたの不戦勝です！");
+                
+                // 通信が切れているのでRPCは使わず、直接自分の画面に勝利を出す
+                if (visualManager != null) visualManager.EndGame(true); 
+                
+                // 自分も通信を綺麗に閉じておく
+                NetworkManager.Singleton.Shutdown(); 
+            }
+        }
+        else
+        {
+            // 【自分がクライアントの場合】
+            // ホスト（サーバー）が落ちると、クライアントは強制的にここが呼ばれます
+            Debug.Log("対戦相手（ホスト）が切断しました。あなたの不戦勝です！");
+            
+            if (visualManager != null) visualManager.EndGame(true);
+            
+            NetworkManager.Singleton.Shutdown();
+        }
+    }
+
     private void Update()
     {
         if (!IsServer || gm == null) return;
@@ -156,9 +200,66 @@ public class LocalBattleManager:NetworkBehaviour
         Debug.Log("ゲームを開始します");
         gm = new GameManager(first,GetEnemyPlayer(first));
         
+        gm.OnGameFinished += (winner) => GameEnd(winner);
+        
         PackageData(host);
         PackageData(client);
     }
+    //ゲーム終了
+    private void GameEnd(Player winner)
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+        if(winner == host)
+        {
+            EndClientRpc(1);
+        }
+        else if(winner == client)
+        {
+            EndClientRpc(2);
+        }
+        else
+        {
+            EndClientRpc(0);
+        }
+    }
+    [ClientRpc]
+    private void EndClientRpc(int winner)
+    {
+        if (IsServer)
+        {
+            if(winner == 1)
+            {            
+                visualManager.EndGame(true);
+            }
+            else if(winner == 2)
+            {
+                visualManager.EndGame(false);
+            }
+            else
+            {
+                visualManager.DrawGame();
+            }
+        }
+        else
+        {
+            if(winner == 2)
+            {            
+                visualManager.EndGame(true);
+            }
+            else if(winner == 1)
+            {
+                visualManager.EndGame(false);
+            }
+            else
+            {
+                visualManager.DrawGame();
+            }
+        }
+    }
+
     private void NotifyFailSafe(int cardId)
     {
         PackageData(host);

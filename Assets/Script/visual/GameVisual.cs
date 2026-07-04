@@ -37,6 +37,9 @@ public class GameVisual : MonoBehaviour
     [Header("Card PopUp")]
     public GameObject cardPopupPanel;
     public TextMeshProUGUI cardPopupText;
+    [Header("End Game")]
+    public GameObject endGame;
+    public TextMeshProUGUI endText;
     private GameManager gm;
     private Player player1;
     private Player player2;
@@ -58,7 +61,7 @@ public class GameVisual : MonoBehaviour
     List<Card> player2Deck = new List<Card>();
     void Start()
     {
-        
+        endGame.SetActive(false);
         MariganField.SetActive(true);
         foreach(int cardId in DeckManager.player1Deck)
         {
@@ -77,9 +80,25 @@ public class GameVisual : MonoBehaviour
         endTurnButton.onClick.AddListener(OnEndTurnClicked);
         selfGarbageButton.onClick.AddListener(OnSelfGarbageClicked);
 
+        MariganField.SetActive(true);
         DrawMarigan(player1,player2);
 
+        gm.OnGameFinished += (winner) => GameEnd(winner);
+
         UpdateUI();
+    }
+
+    private void GameEnd(Player winner)
+    {
+        endGame.SetActive(true);
+        if(winner == player1)
+        {
+            endText.text = "勝者:先行";
+        }
+        else
+        {
+            endText.text = "勝者:後攻";
+        }
     }
     private void DrawMarigan(Player pl1,Player pl2)
     {

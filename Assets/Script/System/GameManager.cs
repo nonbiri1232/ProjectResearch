@@ -182,6 +182,12 @@ public class GameManager
         }
         StartPhase(wait,move);
     }
+    public void Surrender(Player surrenderPlayer)
+    {
+        winner = surrenderPlayer;
+        currentState = GameState.Finished;
+        OnGameFinished?.Invoke(winner);
+    }
     public bool ExecuteAction(Player move,Player wait,PlayerAction action)
     {
         bool isCorrect = false;
