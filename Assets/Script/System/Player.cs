@@ -141,7 +141,7 @@ public class Player
             c.isProxy = c.Proxy;
             c.isSandBox = c.SandBox;
             c.isSegfault = c.Segfault;
-
+            
             OnFailSafeTriggered?.Invoke(c);
         }
         if (isStartPhase && target.Count > 0)

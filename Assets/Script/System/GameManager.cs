@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 public enum GameState
 {
     Processing,
@@ -22,7 +23,6 @@ public enum PhaseState
     Main,
     End
 }
-
 public class PlayerAction
 {
     public ActionType type;
@@ -73,6 +73,7 @@ public class GameManager
     public Card currentScope = null;
     public PhaseState currentPhase;
     List<Player> Didmarigan = new List<Player>();
+    List<PlayLog> logs = new List<PlayLog>();
 
     public GameManager(Player first,Player second)
     {
@@ -123,6 +124,7 @@ public class GameManager
                 if (c.IsFailSafe())
                 {
                     move.DoFailSafe(wait,c);
+                    WriteLog(LogType.FailSafe,c);
                     break;
                 }
             }
@@ -136,6 +138,7 @@ public class GameManager
         {
             MainPhase(move,wait);
         }
+        WriteLog(LogType.TurnStart);
         currentState = GameState.WaitingForInput;
     }
 
@@ -171,6 +174,7 @@ public class GameManager
                 if(c.IsFailSafe())
                 {
                     move.DoFailSafe(wait,c);
+                    WriteLog(LogType.FailSafe,c);
                     break;
                 }
             }
@@ -201,13 +205,15 @@ public class GameManager
                 switch(action.type)
                 {
                     case ActionType.SelfGarbage:
-                        move.DestoryField(wait,action.targetCard,true);
+                        move.DestoryField(wait,action.targetCard,true);                    
+                        WriteLog(LogType.SelfDestory,action.targetCard);
                         MainPhase(move,wait);
                         isCorrect = true;
                         break;
                     case ActionType.Marigan:
                         if(systemTurn == 1 && Didmarigan.Contains(move)){
                             move.Marigan(action.targetCard);
+                            WriteLog(LogType.Marigan,action.targetCard);
                             Didmarigan.Remove(move);
                             if(Didmarigan.Count == 0)
                             {    
@@ -223,10 +229,14 @@ public class GameManager
                 {
                     case ActionType.Attack:
                         isCorrect = Attack(move,wait,action);
+                        if(isCorrect)
+                            WriteLog(LogType.Attack,action.sourceCard,action.targetCard);
                         break;
                 
                     case ActionType.Play:
                         isCorrect = Play(move,wait,action);
+                        if(isCorrect)
+                            WriteLog(LogType.PlayCard,action.sourceCard);
                         break;
                 
                     case ActionType.End :
@@ -425,5 +435,29 @@ public class GameManager
         source.isEncrypted = false;
         source.isAttacked++;
         return true;
+    }
+    public void WriteLog(LogType type,Card ccard=null,List<Card> ccards=null)
+    {
+        if (ccard != null)
+        {
+            CardSnapshot scard = PlayLog.PackageData(ccard);
+            if(ccards != null)
+            {
+                List<CardSnapshot> scards = new List<CardSnapshot>(PlayLog.PackageData(ccards));
+                logs.Add(new PlayLog(systemTurn/2,turn == player1,type,scard));
+                return;
+            }
+            logs.Add(new PlayLog(systemTurn/2,turn == player1,type,scard));
+        }
+        logs.Add(new PlayLog(systemTurn/2,turn == player1,type));
+    }
+    public void WriteLog(LogType type,List<Card> ccards)
+    {
+        if(ccards != null)
+        {
+            List<CardSnapshot> scards = new List<CardSnapshot>(PlayLog.PackageData(ccards));
+            logs.Add(new PlayLog(systemTurn/2,turn == player1,type,scards.ToArray()));
+            return;
+        }
     }
 }
