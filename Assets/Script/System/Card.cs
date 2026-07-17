@@ -58,7 +58,7 @@ public class Card
     public int Attack{get; set;}
     public int ChangeHp = 0;
     public int Hp{get;set;}
-    private Random rand;
+    private static readonly Random rand = new Random();
     public void OnPlay()
     {
         Daemon = isDaemon;
@@ -147,6 +147,7 @@ public class Card
     }
     public static int GetCardId(Card c)
     {
+        if(c == null)return -1;
         string className = c.GetType().Name;
         switch (className)
         {

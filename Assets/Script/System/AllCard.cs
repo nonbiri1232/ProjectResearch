@@ -17,9 +17,9 @@ public class SledOverClock : Card
         cr.effectOnPlay.Add(this);
         foreach(Card c in player.hand)
         {
-            if(c.Cost >= 5)
+            if(c.Cost > 2)
             {
-                c.ChangeCost -= c.Cost;
+                c.ChangeCost -= 2;
                 c.Cost -= 2;
             }
             else
@@ -34,6 +34,11 @@ public class SledOverClock : Card
     {
         cr.effectOnAttack.Add(this);
         cr.effectOnPlay.Add(this);
+    }
+    public override void EndPhase(Player Enemy)
+    {
+        cr.effectOnAttack.Remove(this);
+        cr.effectOnPlay.Remove(this);
     }
     public override void Destructor(Player Enemy, List<Card> target = null)
     {
@@ -325,6 +330,7 @@ public class Paging : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
+        if(target == null || target.Count == 0)return;
         player.deck.Add(target[0]);
         player.hand.Remove(target[0]);
         player.Shuffle();
@@ -380,9 +386,10 @@ public class CarnelPanicZero : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        if(player.maxMemory != 1)
+        if(player.maxMemory != 1 && player.field.Contains(this))
         {
             player.field.Remove(this);
+            player.maxMemory -= this.Cost;
             player.deck.Add(this);
             player.Shuffle();
         }
@@ -416,7 +423,7 @@ public class CarnelPanicZero : Card
                 {
                     if(c.Cost >= 5)
                     {
-                        c.ChangeCost -= c.Cost;
+                        c.ChangeCost -= 5;
                         c.Cost -= 5;
                     }
                     else

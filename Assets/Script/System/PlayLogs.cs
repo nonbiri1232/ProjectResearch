@@ -43,23 +43,6 @@ public class PlayLog
         this.type = type;
         this.targetName = targetName;
     }
-
-    // 画面にテキストとして表示するための変換メソッド
-    public string ToDisplayText()
-    {
-        string playerStr = isPlayer1 ? "先行" : "後攻";
-        switch (type)
-        {
-            case LogType.PlayCard:
-                return $"[Turn {turnNumber}] {playerStr}が「{cardName}」をプレイ！";
-            case LogType.Attack:
-                return $"[Turn {turnNumber}] 「{cardName}」が「{targetName}」に攻撃！";
-            case LogType.FailSafe:
-                return $"[Turn {turnNumber}] 【FailSafe発動】「{cardName}」！";
-            default:
-                return $"[Turn {turnNumber}] {playerStr}の行動";
-        }
-    }
     public static CardSnapshot PackageData(Card target)
     {
         CardSnapshot cardData;
@@ -79,6 +62,7 @@ public class PlayLog
             cardData.atk = c.Attack;
             cardData.cost = c.Cost;
             cardData.hp = c.Hp;
+            cardDatas.Add(cardData);
         }
         return cardDatas.ToArray();
     }

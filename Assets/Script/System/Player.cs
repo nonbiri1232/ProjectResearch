@@ -27,8 +27,12 @@ public class Player
         }
         rand = new Random();
     }
-    public void Marigan(List<Card> cards)
+    public bool Marigan(List<Card> cards)
     {
+        if(cards == null)
+        {
+            return false;
+        }
         Draw(cards.Count);
         foreach(var c in cards)
         {
@@ -36,6 +40,7 @@ public class Player
             deck.Add(c);
         }
         Shuffle();
+        return true;
     }
     public void DirectAttack(Player enemy,Card attacker)
     {
@@ -45,6 +50,8 @@ public class Player
 
     private Card RandomSelect(List<Card> target)
     {
+        if(target == null || target.Count == 0)return null;
+        if(target == null)return null;
         int size = target.Count;
         int rnd = rand.Next(0,size);
         return target[rnd];
@@ -110,7 +117,7 @@ public class Player
         {
             return;
         }
-        foreach(var c in target.ToList())
+        foreach(var c in target.Where(c=>c != null).Distinct().ToList())
         {
             if(c.isDaemon == true)
             {
@@ -141,8 +148,6 @@ public class Player
             c.isProxy = c.Proxy;
             c.isSandBox = c.SandBox;
             c.isSegfault = c.Segfault;
-            
-            OnFailSafeTriggered?.Invoke(c);
         }
         if (isStartPhase && target.Count > 0)
         {
@@ -156,9 +161,10 @@ public class Player
         c.Cost = 0;
         field.Add(c);
         deck.Remove(c);
-        c.Constructor(enemy);
         c.OnPlay();
         c.FailSafe(enemy);
+        //カードのフェイルセーフ側でコンストラクタを呼び出す。
+        OnFailSafeTriggered?.Invoke(c);
     }
 
     public void DrawG()
@@ -172,20 +178,41 @@ public class Player
         garbage.Remove(c);
         hand.Add(c);
     }
-    public void PlayFeild(Card c)
+    public bool PlayFeild(Card c)
     {
+        if(c== null || field.Contains(c)) return false;
         usedMemory += c.Cost;
         if(c.Type == Card.CardType.Scope)
         {
-            hand.Remove(c);
+            if(hand.Contains(c))
+                hand.Remove(c);
+            else if(deck.Contains(c))
+                deck.Remove(c);
+            else if(garbage.Contains(c))
+                garbage.Remove(c);
+            gm.currentScope.player.garbage.Add(gm.currentScope);
             gm.currentScope = c;
         }
         else
-        {            
-            field.Add(c);
-            fieldCost += c.Cost;
-            hand.Remove(c);
+        {
+            if (hand.Contains(c))
+            {
+                hand.Remove(c);   
+                field.Add(c);
+                fieldCost += c.Cost;
+            }
+            else if(deck.Contains(c)){
+                deck.Remove(c);
+                field.Add(c);
+                fieldCost += c.Cost;
+            }
+            else if(garbage.Contains(c)){
+                garbage.Remove(c);
+                field.Add(c);
+                fieldCost += c.Cost;
+            }
         }
+        return true;
     }  
     //カードIDからインスタンスを作成する。
     public static List<Card> ChangeCard(int[] deckData)
@@ -194,6 +221,7 @@ public class Player
         foreach(int i in deckData)
         {
             Card c = Card.CreateCardInstance(i);
+            if(c==null)continue;
             deck.Add(c);
         }
         return deck;
@@ -204,6 +232,7 @@ public class Player
         foreach(CardData data in deckData)
         {
             Card c = Card.CreateCardInstance(data.id);
+            if(c==null)continue;
             deck.Add(c);
             c.Attack = data.atk;
             c.Hp = data.hp;
