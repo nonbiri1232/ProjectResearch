@@ -321,15 +321,18 @@ public class GameManager
         if(action==null||action.sourceCard == null)return false;
         if(action.sourceCard.player != turn)return false;
         if(turn.field.Contains(action.sourceCard))return false;
+        bool ignoreAssert = move.field.Any(c => c is ForcedDebugMode); //変更箇所１//
         //プレイできるかを確認
         if (action.isAddCost)
         {
             if(move.fieldCost + action.sourceCard.Cost + 1 > move.maxMemory || move.usedMemory + action.sourceCard.Cost + 1 > move.usableMemory) return false;
+            if(action.sourceCard.isAssert && !ignoreAssert && move.maxMemory > action.sourceCard.Assert) return false;//変更箇所２//
             if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
             if(!action.sourceCard.AddCost(wait)) return false;
         }else{
             if(move.fieldCost + action.sourceCard.Cost > move.maxMemory || move.usedMemory + action.sourceCard.Cost > move.usableMemory) return false;
             if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
+            if(action.sourceCard.isAssert && !ignoreAssert && move.maxMemory > action.sourceCard.Assert) return false;//変更箇所３//
             if(!action.sourceCard.AddCost(wait)) return false;
         }
         if (!ValidateTargets(move,wait,action.sourceCard,action.targetCard))
