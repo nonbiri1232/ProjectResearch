@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
-using Unity.VisualScripting;
 public enum GameState
 {
     Processing,
@@ -116,8 +114,9 @@ public class GameManager
         }
         if(turn.field.Count > 0)
         {
-            foreach(var c in turn.field)
+            foreach(var c in turn.field.ToList())
             {
+                if(!turn.field.Contains(c))continue;
                 c.StartPhase(wait);
                 c.isAttacked = 0;
             }
@@ -159,6 +158,10 @@ public class GameManager
         {
             foreach(var c in turn.field.ToList())
             {
+                if (!turn.field.Contains(c))
+                {
+                    continue;
+                }
                 if(c.Type == Card.CardType.Object){
                     c.isFirstTurn = false;
                     c.isCanAttack = true;
@@ -183,6 +186,10 @@ public class GameManager
                     break;
                 }
             }
+        }
+        if (currentScope != null && currentScope.player == move)
+        {
+            currentScope.EndPhase(wait);
         }
         if (IsFinish(move,wait))
         {
@@ -211,7 +218,8 @@ public class GameManager
                 switch(action.type)
                 {
                     case ActionType.SelfGarbage:
-                        if (!CheckCorrectPlayer(move, wait))
+                        if (!CheckCorrectPlayer(move, wait)||action.targetCard == null||action.targetCard.Count == 0||
+                            action.targetCard.Any(c => c == null||!move.field.Contains(c)))
                         {
                             currentState = GameState.WaitingForInput;
                             return false;
@@ -224,7 +232,10 @@ public class GameManager
                     case ActionType.Marigan:
                         if(systemTurn == 1 && Didmarigan.Contains(move)){
                             isCorrect = move.Marigan(action.targetCard);
-                            if(!isCorrect){return isCorrect;}
+                            if(!isCorrect){
+                                currentState = GameState.WaitingForInput;
+                                return isCorrect;
+                            }
                             WriteLog(LogType.Marigan,action.targetCard);
                             Didmarigan.Remove(move);
                             if(Didmarigan.Count == 0)
@@ -327,21 +338,18 @@ public class GameManager
         {
             if(move.fieldCost + action.sourceCard.Cost + 1 > move.maxMemory || move.usedMemory + action.sourceCard.Cost + 1 > move.usableMemory) return false;
             if(action.sourceCard.isAssert && !ignoreAssert && move.maxMemory > action.sourceCard.Assert) return false;//変更箇所２//
-            if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
             if(!action.sourceCard.AddCost(wait)) return false;
         }else{
             if(move.fieldCost + action.sourceCard.Cost > move.maxMemory || move.usedMemory + action.sourceCard.Cost > move.usableMemory) return false;
-            if(action.sourceCard.isAssert && move.maxMemory > action.sourceCard.Assert) return false;
             if(action.sourceCard.isAssert && !ignoreAssert && move.maxMemory > action.sourceCard.Assert) return false;//変更箇所３//
             if(!action.sourceCard.AddCost(wait)) return false;
         }
         if (!ValidateTargets(move,wait,action.sourceCard,action.targetCard))
         {
-            
+            return false;
         }
        
         //カードをプレイする。
-
         //追加コストを払うならコストを1上げて
         //攻撃と体力を+1/+1
         if (action.isAddCost)
@@ -354,7 +362,20 @@ public class GameManager
             action.sourceCard.ChangeAttack += 1;
             action.sourceCard.ChangeHp += 1;
         }
-        move.PlayFeild(action.sourceCard);
+        if (!move.PlayFeild(action.sourceCard))
+        {
+            if (action.isAddCost)
+            {
+                action.sourceCard.isImmediate = action.sourceCard.Immediate;
+                action.sourceCard.Cost -= 1;
+                action.sourceCard.Attack -= 1;
+                action.sourceCard.Hp -= 1;
+                action.sourceCard.ChangeCost -= 1;
+                action.sourceCard.ChangeAttack -= 1;
+                action.sourceCard.ChangeHp -= 1;
+            }
+            return false;
+        }
         if(currentScope != null)
         {
             currentScope.ScopeEffectOnPlay(wait,action.sourceCard);
@@ -377,7 +398,8 @@ public class GameManager
 
         if (targets == null ||
             targets.Count > source.select.numOfSelect ||
-            targets.Any(c => c == null))
+            targets.Any(c => c == null)||
+            targets.Distinct().Count() != targets.Count)
         {
             return false;
         }
@@ -385,14 +407,16 @@ public class GameManager
         switch (source.select.whereTarget)
         {
             case where.hand:
-                return targets.All(move.hand.Contains);
+            return targets.All(c =>
+                c.player == move && move.hand.Contains(c));
 
             case where.selfField:
-                return targets.All(move.field.Contains);
+                return targets.All(c =>
+                    c.player == move && move.field.Contains(c));
 
             case where.enemyField:
-                return targets.All(wait.field.Contains);
-
+                return targets.All(c =>
+                    c.player == wait && wait.field.Contains(c));
             default:
                 return false;
         }
