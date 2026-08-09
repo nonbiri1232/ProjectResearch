@@ -190,7 +190,8 @@ public class Player
                 deck.Remove(c);
             else if(garbage.Contains(c))
                 garbage.Remove(c);
-            gm.currentScope.player.garbage.Add(gm.currentScope);
+            if(gm.currentScope != null)
+                gm.currentScope.player.garbage.Add(gm.currentScope);
             gm.currentScope = c;
         }
         else

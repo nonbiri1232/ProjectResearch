@@ -390,7 +390,7 @@ public class CarnelPanicZero : Card
         if(player.maxMemory != 1 && player.field.Contains(this))
         {
             player.field.Remove(this);
-            player.maxMemory -= this.Cost;
+            player.fieldCost -= this.Cost;
             player.deck.Add(this);
             player.Shuffle();
         }
@@ -401,8 +401,6 @@ public class CarnelPanicZero : Card
     }
     public override bool IsFailSafe()
     {
-        if(player.maxMemory == 1)return true; 
-        if(player.maxMemory > 0 && player.maxMemory <= 3)return true;
         if(player.maxMemory > 0 && player.maxMemory <= 5)return true;
         return false;
     }

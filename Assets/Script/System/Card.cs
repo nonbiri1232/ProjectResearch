@@ -265,25 +265,7 @@ public class Card
     }
     public static Card CreateCardInstance(string className)
     {
-        switch (className)
-        {
-            case "SledOverClock": return new SledOverClock();
-            case "IncrementProcess": return new IncrementProcess();
-            case "ClockDownBot": return new ClockDownBot();
-            case "ParallelCompilation": return new ParallelCompilation();
-            case "PoisonPoint": return new PoisonPoint();
-            case "UnSafeArea": return new UnSafeArea();
-            case "Master": return new Master();
-            case "Raid10": return new Raid10();
-            case "RmRf": return new RmRf();
-            case "Paging": return new Paging();
-            case "BackGroundMiner": return new BackGroundMiner();
-            case "SystemFreeze": return new SystemFreeze();
-            case "CarnelPanicZero": return new CarnelPanicZero();
-            case "AllDelete": return new AllDelete();
-            default:
-                return null;
-        }
+        return CreateCardInstance(GetCardId(className));
     }
     public static Card CreateCardInstance(int cardId)
     {
@@ -303,6 +285,37 @@ public class Card
             case 11: return new SystemFreeze();
             case 12: return new CarnelPanicZero();
             case 13: return new AllDelete();
+            case 14: return new SafeModeOverdrive();
+            case 15: return new ForcedCrashTest();
+            case 16: return new IllegalResourceSale();
+            case 17: return new ForcedDebugMode();
+            case 18: return new RansomwareInfection();
+            case 19: return new LeechProcess();
+            case 20: return new DDoSArea();
+            case 21: return new MultiEncryptionProtocol();
+            case 22: return new TimedLogicBomb();
+            case 23: return new TrojanHorse();
+            case 24: return new MemoryDumpRestore();
+            case 25: return new CoreDumpProcess();
+            case 26: return new ZombieProcess();
+            case 27: return new DeepArchive();
+            case 28: return new RestoreMeister();
+            case 29: return new FakeHoneypot();
+            case 30: return new PingBot();
+            case 31: return new Firewall();
+            case 32: return new DebugProcess();
+            case 33: return new BackupServer();
+            case 34: return new GarbageShredder();
+            case 35: return new Antivirus();
+            case 36: return new Mainframe();
+            case 37: return new DataFetch();
+            case 38: return new ProcessKill();
+            case 39: return new EmergencyEvasion();
+            case 40: return new Override();
+            case 41: return new CacheClear();
+            case 42: return new Format();
+            case 43: return new ApplyPatch();
+            case 44: return new EmergencyPower();
             default:
                 return null;
         }
