@@ -74,6 +74,7 @@ public class GameManager
     public PhaseState currentPhase;
     List<Player> Didmarigan = new List<Player>();
     List<PlayLog> logs = new List<PlayLog>();
+    public int decisionTick = 0;
 
     public GameManager(Player first,Player second)
     {
@@ -192,6 +193,12 @@ public class GameManager
         currentState = GameState.Finished;
         OnGameFinished?.Invoke(winner);
     }
+
+    public bool NeedsMarigan(Player p)
+    {
+        return systemTurn == 1 && Didmarigan.Contains(p);
+    }
+
     public bool ExecuteAction(Player move,Player wait,PlayerAction action)
     {
         bool isCorrect = false;
@@ -249,10 +256,12 @@ public class GameManager
         if (IsFinish(move,wait))
         {
             FinishGame();
+            decisionTick++;
             return true;
         }
         
         currentState = GameState.WaitingForInput;
+        decisionTick++;
         return isCorrect;
         
     }

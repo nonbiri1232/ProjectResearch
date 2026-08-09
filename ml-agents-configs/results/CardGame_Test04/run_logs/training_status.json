@@ -1,0 +1,30 @@
+{
+    "CardGame": {
+        "elo": 1200.0,
+        "checkpoints": [
+            {
+                "steps": 0,
+                "file_path": "results\\CardGame_Test04\\CardGame\\CardGame-0.onnx",
+                "reward": null,
+                "creation_time": 1784020445.564917,
+                "auxillary_file_paths": [
+                    "results\\CardGame_Test04\\CardGame\\CardGame-0.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 0,
+            "file_path": "results\\CardGame_Test04\\CardGame.onnx",
+            "reward": null,
+            "creation_time": 1784020445.564917,
+            "auxillary_file_paths": [
+                "results\\CardGame_Test04\\CardGame\\CardGame-0.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.2.0.dev0",
+        "torch_version": "2.1.2+cpu"
+    }
+}

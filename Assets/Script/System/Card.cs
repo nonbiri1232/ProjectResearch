@@ -58,7 +58,7 @@ public class Card
     public int Attack{get; set;}
     public int ChangeHp = 0;
     public int Hp{get;set;}
-    private Random rand;
+    private Random rand = new Random();
     public void OnPlay()
     {
         Daemon = isDaemon;
