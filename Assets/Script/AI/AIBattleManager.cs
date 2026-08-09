@@ -97,7 +97,7 @@ public class AIBattleManager : MonoBehaviour
         gm.OnGameFinished += HandleGameFinished;
         observedDecisionTick = gm.decisionTick;
 
-        ConfigureAgentBehavior();
+        if (!ConfigureAgentBehavior()) return;
         aiAgent.Initialize(aiPlayer, humanPlayer, gm);
         visual.Initialize(this);
         NotifyBoardChanged();
@@ -120,13 +120,23 @@ public class AIBattleManager : MonoBehaviour
             "AI対戦用デッキが不正です。Deck1とDeck2を保存してください。");
     }
 
-    private void ConfigureAgentBehavior()
+    private bool ConfigureAgentBehavior()
     {
         BehaviorParameters behavior = aiAgent.GetComponent<BehaviorParameters>();
         if (behavior == null)
         {
             Debug.LogError("AI AgentにBehaviorParametersがありません。");
-            return;
+            enabled = false;
+            return false;
+        }
+
+        if (!learnFromHuman && behavior.Model == null)
+        {
+            Debug.LogError(
+                "推論モードにはBehaviorParametersのModel設定が必要です。" +
+                "学習する場合はLearn From HumanをONにしてください。");
+            enabled = false;
+            return false;
         }
 
         // DefaultはPython Trainer接続時に学習し、未接続時はModelを使用する。
@@ -138,6 +148,7 @@ public class AIBattleManager : MonoBehaviour
         Debug.Log(learnFromHuman
             ? "【対人学習】Trainer接続待機モードで開始します。"
             : "【AI対戦】学習済みモデルの推論モードで開始します。");
+        return true;
     }
 
     public bool SubmitMarigan(List<Card> cards)
@@ -380,8 +391,9 @@ public class AIBattleManager : MonoBehaviour
         CompletedMatches++;
         NotifyBoardChanged();
         visual.ShowGameResult(winner == humanPlayer);
+        string mode = learnFromHuman ? "対人学習" : "AI対戦";
         Debug.Log(
-            $"【対人学習】Episode {CompletedMatches} 終了 / " +
+            $"【{mode}】Episode {CompletedMatches} 終了 / " +
             $"AI結果:{(winner == aiPlayer ? "勝利" : "敗北")}");
     }
 

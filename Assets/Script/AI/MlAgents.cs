@@ -11,6 +11,10 @@ public class MlAgents : Agent
     public Player enemyPlayer;
     public GameManager gm;
 
+    private const int ObservationSize = 880;
+    private int lastTick = -1;
+    private bool episodeFinished;
+
     public void Initialize(Player me, Player enemy, GameManager manager)
     {
         if (gm != null)
@@ -21,6 +25,7 @@ public class MlAgents : Agent
         myPlayer = me;
         enemyPlayer = enemy;
         gm = manager;
+        episodeFinished = false;
         lastTick = manager != null ? manager.decisionTick - 1 : -1;
 
         if (gm != null)
@@ -28,8 +33,6 @@ public class MlAgents : Agent
             gm.OnGameFinished += HandleGameFinished;
         }
     }
-
-    private int lastTick = -1;
 
     private void OnDestroy()
     {
@@ -41,7 +44,7 @@ public class MlAgents : Agent
 
     private void Update()
     {
-        if (gm == null) return;
+        if (gm == null || episodeFinished) return;
 
         if (gm.decisionTick != lastTick)
         {
@@ -72,16 +75,23 @@ public class MlAgents : Agent
 
     private void HandleGameFinished(Player winner)
     {
+        if (episodeFinished) return;
+        episodeFinished = true;
+
         Debug.Log($"【学習】対局終了。勝者: {(winner == myPlayer ? "自分" : "相手")}");
-        if (winner == myPlayer) AddReward(1.0f);
-        else if (winner == enemyPlayer) AddReward(-1.0f);
+        if (winner == myPlayer)
+            AddReward(1.0f);
+        else if (winner == enemyPlayer)
+            AddReward(-1.0f);
+
         EndEpisode();
     }
 
 
     public override void WriteDiscreteActionMask(IDiscreteActionMask actionMask)
     {
-        if (gm == null || myPlayer == null || enemyPlayer == null) return;
+        if (episodeFinished || gm == null || myPlayer == null || enemyPlayer == null)
+            return;
 
         if (gm.currentPhase == PhaseState.Start)
         {
@@ -143,7 +153,12 @@ public class MlAgents : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        if (myPlayer == null || enemyPlayer == null) return;
+        if (myPlayer == null || enemyPlayer == null)
+        {
+            for (int i = 0; i < ObservationSize; i++)
+                sensor.AddObservation(0f);
+            return;
+        }
 
         //Agentの情報
         sensor.AddObservation(myPlayer.maxMemory);
@@ -251,7 +266,7 @@ public class MlAgents : Agent
     //   Branch 8~27  (2 x20): 場マスク    [i]=1なら自分の場のi番目をSelfGarbageの対象に含める
     public override void OnActionReceived(ActionBuffers actions)
     {
-        if (!ComputeIsMyTurn()) return;
+        if (episodeFinished || !ComputeIsMyTurn()) return;
 
         var d = actions.DiscreteActions;
         if (d.Length < 28)

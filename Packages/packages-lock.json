@@ -212,7 +212,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ml-agents": {
-      "version": "file:C:/Users/nonbiri/ml-agents/com.unity.ml-agents",
+      "version": "file:C:/Users/yasuo/Documents/ml-agents-release_23_tag/com.unity.ml-agents",
       "depth": 0,
       "source": "local",
       "dependencies": {
