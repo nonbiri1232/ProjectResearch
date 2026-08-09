@@ -105,3 +105,25 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Keep Packages/manifest.json and Packages/packages-lock.json tracked.
+# Ignore package source copied into the project; use the pinned UPM dependency instead.
+/[Pp]ackages/com.unity.ml-agents/
+/[Pp]ackages/com.unity.ml-agents.*.tgz
+
+# Python environments and caches used by ML-Agents training
+.venv/
+venv/
+ml_env/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ML-Agents generated training output (configs and selected ONNX assets stay tracked)
+/[Rr]esults/
+/[Mm]l-agents-configs/[Rr]esults/
+/[Aa]ssets/ML-Agents/Timers/
+**/events.out.tfevents.*
+**/run_logs/
+**/checkpoint.pt
+**/*.pt

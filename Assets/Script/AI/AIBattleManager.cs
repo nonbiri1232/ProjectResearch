@@ -1,4 +1,5 @@
 using System;
+
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -168,23 +169,7 @@ public class AIBattleManager : MonoBehaviour
 
     public bool CanBeginPlay(Card source, out string reason)
     {
-        if (!ValidatePlayBasics(source, false, out reason)) return false;
-
-        if (source.select != null && source.select.isSelectConstructor)
-        {
-            List<Card> pool = GetTargetPool(source.select.whereTarget);
-            int required = source.select.numOfSelect;
-            int validCount = pool.Count(candidate => source.ValidateTargets(
-                humanPlayer, aiPlayer, new List<Card>() { candidate }));
-            if (validCount < required)
-            {
-                reason = $"有効な対象が不足しています（必要:{required}、候補:{validCount}）。";
-                return false;
-            }
-        }
-
-        reason = null;
-        return true;
+        return ValidatePlayBasics(source, false, out reason);
     }
 
     public bool PlayCard(Card source, List<Card> targets = null, bool addCost = false)
@@ -229,14 +214,19 @@ public class AIBattleManager : MonoBehaviour
             return true;
         }
 
-        int required = source.select.numOfSelect;
-        if (targets == null || targets.Count != required)
+        int selectedCount = targets?.Count ?? 0;
+        if (selectedCount == 0)
         {
-            reason = $"対象数が不正です（必要:{required}、選択:{targets?.Count ?? 0}）。";
+            reason = null;
+            return true;
+        }
+        if (selectedCount > source.select.numOfSelect)
+        {
+            reason = $"対象数が上限を超えています（上限:{source.select.numOfSelect}、選択:{selectedCount}）。";
             return false;
         }
         if (targets.Any(card => card == null) ||
-            targets.Distinct().Count() != targets.Count)
+            targets.Distinct().Count() != selectedCount)
         {
             reason = "対象にnullまたは重複があります。";
             return false;
