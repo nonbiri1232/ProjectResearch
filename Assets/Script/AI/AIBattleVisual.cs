@@ -143,8 +143,28 @@ public class AIBattleVisual : MonoBehaviour
     public void ShowGameResult(bool humanWon)
     {
         SetActive(endGamePanel, true);
-        if (endText != null) endText.text = humanWon ? "勝利" : "敗北";
+        if (endText != null)
+        {
+            string mode = manager.LearnFromHuman ? "\nAIへ学習結果を送信しました" : string.Empty;
+            endText.text = (humanWon ? "勝利" : "敗北") + mode;
+        }
         CloseSelection();
+    }
+
+    // EndGamePanelの「再戦」ボタンから呼ぶ。
+    public void StartNextBattle()
+    {
+        CancelSelection();
+        mariganCards.Clear();
+        mariganDrawn = false;
+        SetActive(endGamePanel, false);
+        manager.StartNextBattle();
+    }
+
+    // 任意の「投了」ボタンから呼ぶ。AI勝利としてEpisodeを終了する。
+    public void Surrender()
+    {
+        manager.SurrenderHuman();
     }
 
     private string BuildPlayerStatus(Player player, bool hideHand)

@@ -21,6 +21,10 @@ public class AIBattleManager : MonoBehaviour
     [Header("Turn")]
     [SerializeField] private bool randomizeFirstPlayer;
 
+    [Header("ML-Agents")]
+    [Tooltip("ON: Python Trainerへ接続して人間との対戦を学習。OFF: ONNXで推論のみ。")]
+    [SerializeField] private bool learnFromHuman;
+
     private GameManager gm;
     private Player humanPlayer;
     private Player aiPlayer;
@@ -34,6 +38,8 @@ public class AIBattleManager : MonoBehaviour
     public bool IsHumanTurn => gm != null && gm.turn == humanPlayer;
     public PhaseState CurrentPhase => gm != null ? gm.currentPhase : PhaseState.Start;
     public bool IsFinished => gm != null && gm.currentState == GameState.Finished;
+    public bool LearnFromHuman => learnFromHuman;
+    public int CompletedMatches { get; private set; }
 
     private void Start()
     {
@@ -70,6 +76,11 @@ public class AIBattleManager : MonoBehaviour
 
     private void StartBattle()
     {
+        if (gm != null)
+        {
+            gm.OnGameFinished -= HandleGameFinished;
+        }
+
         List<Card> humanDeck = BuildDeck(
             useSavedDecks ? DeckManager.player1Deck : null);
         List<Card> aiDeck = BuildDeck(
@@ -86,7 +97,7 @@ public class AIBattleManager : MonoBehaviour
         gm.OnGameFinished += HandleGameFinished;
         observedDecisionTick = gm.decisionTick;
 
-        ConfigureAgentForInference();
+        ConfigureAgentBehavior();
         aiAgent.Initialize(aiPlayer, humanPlayer, gm);
         visual.Initialize(this);
         NotifyBoardChanged();
@@ -109,7 +120,7 @@ public class AIBattleManager : MonoBehaviour
             "AI対戦用デッキが不正です。Deck1とDeck2を保存してください。");
     }
 
-    private void ConfigureAgentForInference()
+    private void ConfigureAgentBehavior()
     {
         BehaviorParameters behavior = aiAgent.GetComponent<BehaviorParameters>();
         if (behavior == null)
@@ -118,9 +129,15 @@ public class AIBattleManager : MonoBehaviour
             return;
         }
 
-        // ModelはBehavior ParametersのInspectorで設定する。
-        // InferenceOnlyならPythonトレーナー未接続時も学習済みモデルだけで動作する。
-        behavior.BehaviorType = BehaviorType.InferenceOnly;
+        // DefaultはPython Trainer接続時に学習し、未接続時はModelを使用する。
+        // InferenceOnlyはInspectorに設定したONNXだけで動作する。
+        behavior.BehaviorType = learnFromHuman
+            ? BehaviorType.Default
+            : BehaviorType.InferenceOnly;
+
+        Debug.Log(learnFromHuman
+            ? "【対人学習】Trainer接続待機モードで開始します。"
+            : "【AI対戦】学習済みモデルの推論モードで開始します。");
     }
 
     public bool SubmitMarigan(List<Card> cards)
@@ -341,10 +358,31 @@ public class AIBattleManager : MonoBehaviour
         return result;
     }
 
+    public void StartNextBattle()
+    {
+        if (gm != null && gm.currentState != GameState.Finished)
+        {
+            Debug.LogWarning("対戦中は次の対戦を開始できません。");
+            return;
+        }
+
+        StartBattle();
+    }
+
+    public void SurrenderHuman()
+    {
+        if (gm == null || gm.currentState == GameState.Finished) return;
+        gm.Surrender(humanPlayer);
+    }
+
     private void HandleGameFinished(Player winner)
     {
+        CompletedMatches++;
         NotifyBoardChanged();
         visual.ShowGameResult(winner == humanPlayer);
+        Debug.Log(
+            $"【対人学習】Episode {CompletedMatches} 終了 / " +
+            $"AI結果:{(winner == aiPlayer ? "勝利" : "敗北")}");
     }
 
     private void NotifyBoardChanged()
