@@ -13,8 +13,8 @@ public class SledOverClock : Card
 
     public override void Constructor(Player Enemy,List<Card> target)
     {
-        cr.effectOnAttack.Add(this);
-        cr.effectOnPlay.Add(this);
+        if(!cr.effectOnAttack.Contains(this))cr.effectOnAttack.Add(this);
+        if(!cr.effectOnPlay.Contains(this))cr.effectOnPlay.Add(this);
         foreach(Card c in player.hand)
         {
             if(c.Cost > 2)
@@ -32,8 +32,8 @@ public class SledOverClock : Card
     }
     public override void StartPhase(Player Enemy)
     {
-        cr.effectOnAttack.Add(this);
-        cr.effectOnPlay.Add(this);
+        if(!cr.effectOnAttack.Contains(this))cr.effectOnAttack.Add(this);
+        if(!cr.effectOnPlay.Contains(this))cr.effectOnPlay.Add(this);
     }
     public override void EndPhase(Player Enemy)
     {
@@ -65,20 +65,17 @@ public class IncrementProcess : Card
         Type = CardType.Object;
         select = new Select(where.selfField,1);
     }
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 &&
+               targets[0] != this && targets[0].Type == CardType.Object;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        Card actualTarget = null;
-        if(target != null && target.Count > 0)
-        {
-            actualTarget = target[0];
-        }
-        else
-        {
-            if(player.field.Count > 0)
-            {
-                actualTarget = RandomSelect(player.field);
-            }
-        }
+        Card actualTarget = target != null && target.Count == 1
+            ? target[0]
+            : RandomSelect(player.field.FindAll(c=>c != this && c.Type == CardType.Object));
         if(actualTarget != null){
             actualTarget.Attack += 1;
             actualTarget.ChangeAttack += 1;
@@ -104,20 +101,17 @@ public class ClockDownBot : Card
         select = new Select(where.enemyField,1);
     }
 
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 &&
+               targets[0].Type == CardType.Object;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        Card actualTarget = null;
-        if(target != null && target.Count > 0)
-        {
-            actualTarget = target[0];
-        }
-        else
-        {
-            if(Enemy.field.Count > 0)
-            {
-                actualTarget = RandomSelect(Enemy.field);
-            }
-        }
+        Card actualTarget = target != null && target.Count == 1
+            ? target[0]
+            : RandomSelect(Enemy.field.FindAll(c=>c.Type == CardType.Object));
         if(actualTarget != null)
         {
             if(actualTarget.Attack >= 3)
@@ -230,7 +224,7 @@ public class Master : Card
         List<Card> randaomCard = new List<Card>(); 
         foreach(var c in player.deck)
         {
-            if(c.Cost >= 8)
+            if(c.Type == CardType.Object && c.Cost >= 8)
             {
                 randaomCard.Add(c);
             }
@@ -247,10 +241,8 @@ public class Master : Card
             c2.Cost = 0;
             c1.isImmediate = true;
             c2.isImmediate = true;
-            var action1 = new PlayerAction(ActionType.Play,c1);
-            var action2 = new PlayerAction(ActionType.Play,c2);
-            player.gm.Play(player,Enemy,action1);
-            player.gm.Play(player,Enemy,action2);
+            CardImplementationUtilities.MaterializeWithoutUsableMemory(player, Enemy, c1);
+            CardImplementationUtilities.MaterializeWithoutUsableMemory(player, Enemy, c2);
         }
         else if(randaomCard.Count == 1)
         {
@@ -258,8 +250,7 @@ public class Master : Card
             c1.ChangeCost -= c1.Cost;
             c1.Cost = 0;
             c1.isImmediate = true;
-            var action1 = new PlayerAction(ActionType.Play,c1);
-            player.gm.Play(player,Enemy,action1);
+            CardImplementationUtilities.MaterializeWithoutUsableMemory(player, Enemy, c1);
         }
     }
 }
@@ -305,13 +296,13 @@ public class RmRf : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        List<Card> targetList = new List<Card>(Enemy.field);
+        List<Card> targetList = Enemy.field.FindAll(c=>c.Type == CardType.Object);
         player.DestoryField(Enemy, targetList);
     }
 
     public override void Destructor(Player Enemy, List<Card> target = null)
     {
-        Card c = RandomSelect(Enemy.field);
+        Card c = RandomSelect(Enemy.field.FindAll(card=>card.Type == CardType.Object));
         if (c != null)
         {
             List<Card> list = new List<Card>(){c};
@@ -328,11 +319,16 @@ public class Paging : Card
         select = new Select(where.hand,1);
     }
 
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 && targets[0] != this;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        if(target == null || target.Count == 0)return;
-        player.deck.Add(target[0]);
+        if(target == null || target.Count != 1)return;
         player.hand.Remove(target[0]);
+        player.deck.Add(target[0]);
         player.Shuffle();
         player.Draw(2);
     }
@@ -370,7 +366,7 @@ public class SystemFreeze : Card
 
     public override void Destructor(Player Enemy, List<Card> target = null)
     {
-        List<Card> targetList = new List<Card>(Enemy.field);
+        List<Card> targetList = Enemy.field.FindAll(c=>c.Type == CardType.Object);
         player.DestoryField(Enemy, targetList);
     }
 }
@@ -469,6 +465,21 @@ public class AllDelete : Card
 }
 public static class CardImplementationUtilities
 {
+    public static bool MaterializeWithoutUsableMemory(Player owner, Player enemy, Card card)
+    {
+        if(owner == null || enemy == null || card == null)return false;
+        if(!owner.PlayFeild(card, false))return false;
+
+        if(owner.gm.currentScope != null)
+        {
+            owner.gm.currentScope.ScopeEffectOnPlay(enemy, card);
+        }
+        card.cr.OnPlay(card);
+        card.Constructor(enemy);
+        card.OnPlay();
+        return true;
+    }
+
     public static int TransferMemory(Player from, Player to, int amount)
     {
         int transferable = from.maxMemory - 1;
@@ -496,6 +507,7 @@ public static class CardImplementationUtilities
         List<Card> destroyed = new List<Card>();
         foreach(Card c in targets)
         {
+            if(c.Type != Card.CardType.Object)continue;
             c.Hp -= damage;
             c.ChangeHp -= damage;
             if(c.Hp <= 0)destroyed.Add(c);
@@ -520,12 +532,12 @@ public class SafeModeOverdrive : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        cr.effectOnAttack.Add(this);
+        if(!cr.effectOnAttack.Contains(this))cr.effectOnAttack.Add(this);
     }
 
     public override void StartPhase(Player Enemy)
     {
-        cr.effectOnAttack.Add(this);
+        if(!cr.effectOnAttack.Contains(this))cr.effectOnAttack.Add(this);
     }
 
     public override void EndPhase(Player Enemy)
@@ -645,10 +657,9 @@ public class RansomwareInfection : Card
             infectedCard.AddDestructorEffect(
                 (enemyOfDestroyedCard, ignoredTargets) =>
                 {
-                    CardImplementationUtilities.TransferMemory(infectedCard.player,infectionOwner,Cost);
+                    CardImplementationUtilities.TransferMemory(infectedCard.player,infectionOwner,infectedCard.Cost);
                 });
         }
-        foreach(Card c in Enemy.field)c.isCanAttack = false;
     }
 }
 
@@ -669,7 +680,7 @@ public class LeechProcess : Card
         CardImplementationUtilities.TransferMemory(Enemy, player, 3);
     }
 
-    public override void StartPhase(Player Enemy)
+    public override void OpponentEndPhase(Player Enemy)
     {
         CardImplementationUtilities.TransferMemory(Enemy, player, 1);
     }
@@ -677,8 +688,6 @@ public class LeechProcess : Card
 
 public class DDoSArea : Card
 {
-    private List<Card> taxedCards = new List<Card>();
-
     public DDoSArea()
     {
         Cost = 5;
@@ -688,23 +697,21 @@ public class DDoSArea : Card
 
     public override void ScopeEffectOnPlay(Player pl, Card target = null)
     {
-        if(target == null)return;
-        target.isImmediate = false;
-        target.Cost += 2;
-        target.ChangeCost += 2;
-        taxedCards.Add(target);
-    }
+        if(target == null || target == this)return;
 
-    public override void Destructor(Player Enemy, List<Card> target = null)
-    {
-        foreach(Card c in taxedCards)
-        {
-            if(c == null)continue;
-            c.Cost -= 2;
-            c.ChangeCost -= 2;
-            if(c.Cost < 0)c.Cost = 0;
-        }
-        taxedCards.Clear();
+        Card materializedCard = target;
+        materializedCard.AddDestructorEffect(
+            (enemyOfDestroyedCard, ignoredTargets) =>
+            {
+                Player owner = materializedCard.player;
+                if(owner == null)return;
+
+                Card discarded = RandomSelect(owner.hand);
+                if(discarded == null)return;
+
+                owner.hand.Remove(discarded);
+                owner.garbage.Add(discarded);
+            });
     }
 }
 
@@ -722,7 +729,6 @@ public class MultiEncryptionProtocol : Card
         foreach(Card c in player.field)
         {
             c.isEncrypted = true;
-            c.Encrypted = true;
         }
     }
 }
@@ -740,9 +746,23 @@ public class TimedLogicBomb : Card
         select = new Select(where.enemyField, 1);
     }
 
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 &&
+               targets[0].Type == CardType.Object;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        // The target's custom destructor effect needs an engine-level effect registry.
+        if(target == null || target.Count != 1 || target[0] == null)return;
+        Card infectedCard = target[0];
+        Player infectionOwner = player;
+
+        infectedCard.AddDestructorEffect(
+            (enemyOfDestroyedCard, ignoredTargets) =>
+            {
+                CardImplementationUtilities.TransferMemory(infectedCard.player,infectionOwner,infectedCard.Cost);
+            });
     }
 
     public override void EndPhase(Player Enemy)
@@ -761,6 +781,7 @@ public class ForgedFile : Card
         Type = CardType.Object;
         isDaemon = true;
         isCanAttack = false;
+        attackTimes = 0;
         select = new Select();
     }
 
@@ -790,10 +811,19 @@ public class TrojanHorse : Card
     {
         for(int i = 0; i < 5; i++)
         {
+            if(Enemy.maxMemory - Enemy.fieldCost < 1)break;
             Card token = new ForgedFile();
-            int enemyMemory = Enemy.maxMemory;
-            Enemy.gm.Play(Enemy, player, new PlayerAction(ActionType.Play, token));
-            Enemy.maxMemory = enemyMemory;
+            token.player = Enemy;
+            token.cr = cr;
+            Enemy.field.Add(token);
+            Enemy.fieldCost += token.Cost;
+            if(player.gm.currentScope != null)
+            {
+                player.gm.currentScope.ScopeEffectOnPlay(player,token);
+            }
+            cr.OnPlay(token);
+            token.OnPlay();
+
         }
     }
 }
@@ -813,28 +843,37 @@ public class MemoryDumpRestore : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
+        cr.effectOnPlay.Add(this);
+
         while(true)
         {
-            int highestCost = -1;
+            int availableMemory = player.maxMemory - player.fieldCost;
             List<Card> candidates = new List<Card>();
+            int highestCost = -1;
+
             foreach(Card c in player.garbage)
             {
-                if(c.Type != CardType.Object || c.Cost > player.maxMemory)continue;
+                if(c.Type != CardType.Object || c.Cost > availableMemory)continue;
+
                 if(c.Cost > highestCost)
                 {
                     highestCost = c.Cost;
                     candidates.Clear();
                     candidates.Add(c);
                 }
-                else if(c.Cost == highestCost)candidates.Add(c);
+                else if(c.Cost == highestCost)
+                {
+                    candidates.Add(c);
+                }
             }
+
             if(candidates.Count == 0)break;
+
             Card revived = RandomSelect(candidates);
-            player.garbage.Remove(revived);
             if(revived is ZombieProcess)revived.isDaemon = true;
-            player.gm.Play(player, Enemy, new PlayerAction(ActionType.Play, revived));
+            if(!CardImplementationUtilities.MaterializeWithoutUsableMemory(
+                player, Enemy, revived))break;
         }
-        cr.effectOnPlay.Add(this);
     }
 
     public override void StartPhase(Player Enemy)
@@ -910,7 +949,7 @@ public class ZombieProcess : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        if(player.garbage.Contains(this))isDaemon = true;
+        if(wasPlayedFromGarbage)isDaemon = true;
         player.Draw();
     }
 
@@ -976,13 +1015,26 @@ public class RestoreMeister : Card
                 else if(c.Cost == highestCost)candidates.Add(c);
             }
             if(candidates.Count == 0)break;
+
             Card revived = RandomSelect(candidates);
-            totalOriginalCost += revived.Cost;
-            revived.ChangeCost -= revived.Cost;
+            int originalCost = revived.Cost;
+            bool originalDaemon = revived.isDaemon;
+            revived.ChangeCost -= originalCost;
             revived.Cost = 0;
             if(revived is ZombieProcess)revived.isDaemon = true;
-            player.garbage.Remove(revived);
-            player.gm.Play(player, Enemy, new PlayerAction(ActionType.Play, revived));
+
+            bool played = CardImplementationUtilities.MaterializeWithoutUsableMemory(
+                player, Enemy, revived);
+
+            if(!played)
+            {
+                revived.Cost = originalCost;
+                revived.ChangeCost += originalCost;
+                revived.isDaemon = originalDaemon;
+                break;
+            }
+
+            totalOriginalCost += originalCost;
         }
         Attack += totalOriginalCost;
         ChangeAttack += totalOriginalCost;
@@ -1103,9 +1155,15 @@ public class Antivirus : Card
         select = new Select(where.enemyField, 1);
     }
 
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 &&
+               targets[0].Type == CardType.Object;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        Card actualTarget = target != null && target.Count > 0 ? target[0] : RandomSelect(Enemy.field);
+        Card actualTarget = target != null && target.Count == 1 ? target[0] : null;
         CardImplementationUtilities.DamageObject(player, Enemy, actualTarget, 3);
     }
 }
@@ -1148,10 +1206,16 @@ public class ProcessKill : Card
         select = new Select(where.enemyField, 1);
     }
 
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 &&
+               targets[0].Type == CardType.Object && targets[0].Hp <= 3;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
         Card actualTarget = target != null && target.Count > 0 ? target[0] : null;
-        if(actualTarget != null && actualTarget.Hp <= 3)
+        if(actualTarget != null)
         {
             player.DestoryField(Enemy, new List<Card>(){actualTarget});
         }
@@ -1182,9 +1246,10 @@ public class EmergencyEvasion : Card
 
     public override void FailSafe(Player Enemy, List<Card> target = null)
     {
-        Card selected = RandomSelect(Enemy.field);
+        Card selected = RandomSelect(Enemy.field.FindAll(c=>c.Type == CardType.Object));
         if(selected != null)player.DestoryField(Enemy, new List<Card>(){selected});
         player.Draw(2);
+        this.Constructor(Enemy);
     }
 }
 
@@ -1199,9 +1264,15 @@ public class Override : Card
         select = new Select(where.selfField, 1);
     }
 
+    public override bool ValidateTargets(Player move, Player enemy, List<Card> targets)
+    {
+        return targets != null && targets.Count == 1 &&
+               targets[0].Type == CardType.Object;
+    }
+
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        boostedCard = target != null && target.Count > 0 ? target[0] : null;
+        boostedCard = target != null && target.Count == 1 ? target[0] : null;
         if(boostedCard == null)return;
         boostedCard.Attack += 2;
         boostedCard.ChangeAttack += 2;
@@ -1209,14 +1280,30 @@ public class Override : Card
         boostedCard.ChangeHp += 2;
     }
 
-    public override void EndPhase(Player Enemy)
+    private void RemoveBoost()
     {
         if(boostedCard == null)return;
-        boostedCard.Attack -= 2;
-        boostedCard.ChangeAttack -= 2;
-        boostedCard.Hp -= 2;
-        boostedCard.ChangeHp -= 2;
+
+        if(boostedCard.player != null &&
+           boostedCard.player.field.Contains(boostedCard))
+        {
+            boostedCard.Attack -= 2;
+            boostedCard.ChangeAttack -= 2;
+            boostedCard.Hp -= 2;
+            boostedCard.ChangeHp -= 2;
+        }
+
         boostedCard = null;
+    }
+
+    public override void EndPhase(Player Enemy)
+    {
+        RemoveBoost();
+    }
+
+    public override void Destructor(Player Enemy, List<Card> target = null)
+    {
+        RemoveBoost();
     }
 }
 
@@ -1226,23 +1313,19 @@ public class CacheClear : Card
     {
         Cost = 1;
         Type = CardType.Method;
-        select = new Select(where.hand, 8);
+        select = new Select();
     }
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        int discarded = 0;
-        if(target != null)
+        List<Card> discardedCards = new List<Card>(player.hand);
+        foreach(Card c in discardedCards)
         {
-            foreach(Card c in new List<Card>(target))
-            {
-                if(c == null || !player.hand.Contains(c))continue;
-                player.hand.Remove(c);
-                player.garbage.Add(c);
-                discarded++;
-            }
+            player.hand.Remove(c);
+            player.garbage.Add(c);
         }
-        player.Draw(discarded + 1);
+
+        player.Draw(discardedCards.Count + 1);
     }
 }
 
@@ -1258,8 +1341,8 @@ public class Format : Card
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
         List<Card> allObjects = new List<Card>();
-        allObjects.AddRange(player.field);
-        allObjects.AddRange(Enemy.field);
+        allObjects.AddRange(player.field.FindAll(c=>c.Type == CardType.Object));
+        allObjects.AddRange(Enemy.field.FindAll(c=>c.Type == CardType.Object));
         player.DestoryField(Enemy, allObjects);
     }
 }
@@ -1275,13 +1358,20 @@ public class ApplyPatch : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        List<Card> scopes = new List<Card>();
-        foreach(Card c in player.field)if(c.Type == CardType.Scope)scopes.Add(c);
-        foreach(Card c in Enemy.field)if(c.Type == CardType.Scope)scopes.Add(c);
-        if(scopes.Count > 0)
+        Card scope = player.gm.currentScope;
+        if(scope != null)
         {
-            Card selected = RandomSelect(scopes);
-            player.DestoryField(Enemy, new List<Card>(){selected});
+            Player scopeOwner = scope.player;
+            Player scopeEnemy = scopeOwner == player ? Enemy : player;
+
+            scope.ExecuteDestructor(scopeEnemy);
+            if(scopeOwner != null && !scopeOwner.garbage.Contains(scope))
+            {
+                scopeOwner.garbage.Add(scope);
+            }
+            scope.Cost -= scope.ChangeCost;
+            scope.ChangeCost = 0;
+            player.gm.currentScope = null;
         }
         player.Draw();
     }
@@ -1298,7 +1388,8 @@ public class EmergencyPower : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        player.maxMemory += 4;
+        player.usedMemory -= 4;
+        if(player.usedMemory < 0)player.usedMemory = 0;
         player.Draw();
     }
 }

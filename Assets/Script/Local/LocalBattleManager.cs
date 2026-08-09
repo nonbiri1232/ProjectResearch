@@ -8,6 +8,7 @@ public struct CardData : INetworkSerializable
     public int cost;
     public int atk;
     public int hp;
+    public bool canAttackNow;
 
     // 通信で送るためのパッキング処理
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -16,6 +17,7 @@ public struct CardData : INetworkSerializable
         serializer.SerializeValue(ref cost);
         serializer.SerializeValue(ref atk);
         serializer.SerializeValue(ref hp);
+        serializer.SerializeValue(ref canAttackNow);
     }
 }
 public class LocalBattleManager:NetworkBehaviour
@@ -291,6 +293,18 @@ public class LocalBattleManager:NetworkBehaviour
     {
         visualManager.SetupInitialBoard(selfHand,selfField,enemyField,selfMemory,enemyMemory,scope);
     }
+    private bool CanAttackNow(Card card)
+    {
+        return card != null &&
+               card.Type == Card.CardType.Object &&
+               card.player == gm.turn &&
+               gm.currentPhase == PhaseState.Main &&
+               card.player.field.Contains(card) &&
+               card.isCanAttack &&
+               (!card.isFirstTurn || card.isImmediate) &&
+               card.isAttacked < card.attackTimes;
+    }
+
     private CardData[] transCardData(List<Card> cards)
     {
         CardData[] data = new CardData[cards.Count];
@@ -300,7 +314,8 @@ public class LocalBattleManager:NetworkBehaviour
                 id = Card.GetCardId(cards[i]),
                 cost = cards[i].Cost,
                 atk = cards[i].Attack,
-                hp = cards[i].Hp
+                hp = cards[i].Hp,
+                canAttackNow = CanAttackNow(cards[i])
             };
         }
         return data;   

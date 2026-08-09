@@ -191,6 +191,13 @@ public class GameManager
         {
             currentScope.EndPhase(wait);
         }
+        foreach(Card c in wait.field.ToList())
+        {
+            if(wait.field.Contains(c) && c.Type == Card.CardType.Object)
+            {
+                c.OpponentEndPhase(move);
+            }
+        }
         if (IsFinish(move,wait))
         {
             FinishGame();
@@ -218,8 +225,10 @@ public class GameManager
                 switch(action.type)
                 {
                     case ActionType.SelfGarbage:
-                        if (!CheckCorrectPlayer(move, wait)||action.targetCard == null||action.targetCard.Count == 0||
-                            action.targetCard.Any(c => c == null||!move.field.Contains(c)))
+                        if (!CheckCorrectPlayer(move, wait) ||
+                            (action.targetCard != null &&
+                             (action.targetCard.Any(c => c == null || !move.field.Contains(c)) ||
+                              action.targetCard.Distinct().Count() != action.targetCard.Count)))
                         {
                             currentState = GameState.WaitingForInput;
                             return false;
@@ -396,32 +405,38 @@ public class GameManager
             return targets == null || targets.Count == 0;
         }
 
-        if (targets == null ||
-            targets.Count > source.select.numOfSelect ||
+        if(targets == null || targets.Count == 0)return true;
+
+        if (targets.Count > source.select.numOfSelect ||
             targets.Any(c => c == null)||
             targets.Distinct().Count() != targets.Count)
         {
             return false;
         }
 
+        bool isValidArea;
         switch (source.select.whereTarget)
         {
             case where.hand:
-            return targets.All(c =>
-                c.player == move && move.hand.Contains(c));
+                isValidArea = targets.All(c =>
+                    c.player == move && move.hand.Contains(c));
+                break;
 
             case where.selfField:
-                return targets.All(c =>
+                isValidArea = targets.All(c =>
                     c.player == move && move.field.Contains(c));
+                break;
 
             case where.enemyField:
-                return targets.All(c =>
+                isValidArea = targets.All(c =>
                     c.player == wait && wait.field.Contains(c));
+                break;
             default:
                 return false;
         }
-    }
 
+        return isValidArea && source.ValidateTargets(move, wait, targets);
+    }
     //攻撃行動
     public bool Attack(Player move,Player wait,PlayerAction action)
     {
@@ -446,7 +461,8 @@ public class GameManager
             return false;
         }
         //直接攻撃できるか
-        if(action.targetCard == null && wait.field.Count <= 0 && !source.isFirstTurn)
+        bool enemyHasObjects = wait.field.Any(c=>c.Type == Card.CardType.Object);
+        if(action.targetCard == null && !enemyHasObjects && !source.isFirstTurn)
         {
             move.DirectAttack(wait,action.sourceCard);
             source.isEncrypted = false;
@@ -459,14 +475,14 @@ public class GameManager
             return false;
         }
         if(action.targetCard == null || action.targetCard.Count == 0)return false;
-        List<Card> checkProxy = new List<Card>(wait.field);
+        List<Card> checkProxy = wait.field.FindAll(c=>c.Type == Card.CardType.Object);
         if (action.targetCard == null || action.targetCard.Count != 1)
         {
             return false;
         }
         //攻撃のターゲットは一枚しか取れない
         var target = action.targetCard[0];
-        if(!wait.field.Contains(target))return false;
+        if(!wait.field.Contains(target) || target.Type != Card.CardType.Object)return false;
         
         //プロキシがいるかを確認
         checkProxy.Remove(target);

@@ -46,6 +46,7 @@ public class Card
     public bool isSegfault{get;set;}
     public bool isEncrypted{get;set;}
     public bool isImmediate{get;set;}
+    public bool wasPlayedFromGarbage{get;set;}
     public int attackTimes{get;protected set;} = 1;
     public bool isAssert{get;protected set;}
     public int Assert{get;protected set;}
@@ -69,6 +70,7 @@ public class Card
         Segfault = isSegfault;
     }
     public virtual bool AddCost(Player Enemy,List<Card> target = null){return true;}
+    public virtual bool ValidateTargets(Player move, Player enemy, List<Card> targets){return true;}
     public virtual void Constructor(Player Enemy,List<Card> target = null){}
     public virtual void Destructor(Player Enemy,List<Card> target = null){}
     public virtual bool IsFailSafe(){return false;}
@@ -78,6 +80,7 @@ public class Card
     public virtual void OnAttack(Player Enemy,Card target = null){}
     public virtual void StartPhase(Player Enemy){}
     public virtual void EndPhase(Player Enemy){}
+    public virtual void OpponentEndPhase(Player Enemy){}
     public virtual void ScopeEffectOnAttack(Player pl,List<Card> target = null){}
     public virtual void ScopeEffectOnPlay(Player pl,Card target = null){}
     public virtual void CrestOnAttack(Player Enemy,List<Card> target = null){}
@@ -111,7 +114,6 @@ public class Card
     protected Card RandomSelect(List<Card> target)
     {
         if(target == null || target.Count == 0)return null;
-        if(target == null)return null;
         int size = target.Count;
         int rnd = rand.Next(0,size);
         return target[rnd];
@@ -175,6 +177,7 @@ public class Card
             case 42: return "Format";
             case 43: return "ApplyPatch";
             case 44: return "EmergencyPower";
+            case 45: return "ForgedFile";
             default:
                 return null;
         }
@@ -228,7 +231,7 @@ public class Card
             case "Format": return 42;
             case "ApplyPatch": return 43;
             case "EmergencyPower": return 44;
-            
+            case "ForgedFile": return 45;
             default:
                 return -1;
         }
@@ -284,6 +287,7 @@ public class Card
             case "Format": return 42;
             case "ApplyPatch": return 43;
             case "EmergencyPower": return 44;
+            case "ForgedFile": return 45;
             default:
                 return -1;
         }
@@ -341,6 +345,7 @@ public class Card
             case 42: return new Format();
             case 43: return new ApplyPatch();
             case 44: return new EmergencyPower();
+            case 45: return new ForgedFile();
             default:
                 return null;
         }

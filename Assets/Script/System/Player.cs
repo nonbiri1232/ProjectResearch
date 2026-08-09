@@ -180,10 +180,11 @@ public class Player
         garbage.Remove(c);
         hand.Add(c);
     }
-    public bool PlayFeild(Card c)
+    public bool PlayFeild(Card c, bool consumeUsableMemory = true)
     {
         if(c== null || field.Contains(c) || gm.currentScope == c) return false;
         if(!hand.Contains(c)&&!deck.Contains(c)&&!garbage.Contains(c))return false;
+        c.wasPlayedFromGarbage = garbage.Contains(c);
         if(c.Type == Card.CardType.Scope)
         {
             if(hand.Contains(c))
@@ -225,7 +226,11 @@ public class Player
                 fieldCost += c.Cost;
             }
         }
-        usedMemory += c.Cost;
+        if(consumeUsableMemory)
+        {
+            usedMemory += c.Cost;
+        }
+
         return true;
     }  
     //カードIDからインスタンスを作成する。
@@ -251,6 +256,7 @@ public class Player
             c.Attack = data.atk;
             c.Hp = data.hp;
             c.Cost = data.cost;
+            c.isCanAttack = data.canAttackNow;
         }
         return deck;
     }
