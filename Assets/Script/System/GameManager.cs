@@ -494,16 +494,20 @@ public class GameManager
         if(!wait.field.Contains(target) || target.Type != Card.CardType.Object)return false;
         
         //プロキシがいるかを確認
-        checkProxy.Remove(target);
-        if(!target.isProxy){
-            foreach(var c in checkProxy)
-            {
-                if (c.isProxy)
-                {           
-                    return false;
+        if(target.isProxy == false)
+        {
+            checkProxy.Remove(target);
+            if(!target.isProxy){
+                foreach(var c in checkProxy)
+                {
+                    if (c.isProxy)
+                    {           
+                        return false;
+                    }
                 }
             }
         }
+        
         //ターゲットが暗号化されているか
         if (target.isEncrypted)
         {

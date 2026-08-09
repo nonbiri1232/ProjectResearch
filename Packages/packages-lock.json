@@ -109,12 +109,12 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ai.inference": {
-      "version": "2.5.0",
+      "version": "2.6.1",
       "depth": 1,
       "source": "registry",
       "dependencies": {
         "com.unity.burst": "1.8.17",
-        "com.unity.dt.app-ui": "1.3.3",
+        "com.unity.dt.app-ui": "1.3.6",
         "com.unity.collections": "2.4.3",
         "com.unity.nuget.newtonsoft-json": "3.2.1",
         "com.unity.modules.imageconversion": "1.0.0"
@@ -212,11 +212,11 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ml-agents": {
-      "version": "file:C:/Users/yasuo/Documents/ml-agents-release_23_tag/com.unity.ml-agents",
+      "version": "file:C:/Users/nonbiri/ml-agents/com.unity.ml-agents",
       "depth": 0,
       "source": "local",
       "dependencies": {
-        "com.unity.ai.inference": "2.2.1",
+        "com.unity.ai.inference": "2.6.1",
         "com.unity.modules.imageconversion": "1.0.0",
         "com.unity.modules.jsonserialize": "1.0.0",
         "com.unity.modules.physics": "1.0.0"
