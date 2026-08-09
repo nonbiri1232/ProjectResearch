@@ -564,19 +564,22 @@ public class ForcedCrashTest : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        int realMemory = player.maxMemory;
-        player.maxMemory = 1;
-        List<Card> deckSnapshot = new List<Card>(player.deck);
-        foreach(Card c in deckSnapshot)
+        int originalMemory = player.maxMemory;
+
+        try
         {
-            if(c == this || !c.IsFailSafe())continue;
-            player.deck.Remove(c);
-            c.ChangeCost -= c.Cost;
-            c.Cost = 0;
-            player.gm.Play(player, Enemy, new PlayerAction(ActionType.Play, c));
-            c.FailSafe(Enemy);
+            List<Card> candidates = player.deck.FindAll(c=>c.IsFailSafe());
+
+            Card selected = RandomSelect(candidates);
+            if(selected != null)
+            {
+                player.DoFailSafe(Enemy, selected);
+            }
         }
-        player.maxMemory = realMemory;
+        finally
+        {
+            player.maxMemory = originalMemory;
+        }
     }
 }
 
@@ -616,7 +619,7 @@ public class ForcedDebugMode : Card
 
     public override void Destructor(Player Enemy, List<Card> target = null)
     {
-        CardImplementationUtilities.TransferMemory(player, Enemy, 2);
+        CardImplementationUtilities.TransferMemory(Enemy, player, 2);
     }
 }
 
@@ -635,7 +638,18 @@ public class RansomwareInfection : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
-        // Injecting a destructor callback into another card still needs an engine hook.
+        Player infectionOwner = player;
+
+        foreach (Card infectedCard in Enemy.field)
+        {
+            infectedCard.isCanAttack = false;
+
+            infectedCard.AddDestructorEffect(
+                (enemyOfDestroyedCard, ignoredTargets) =>
+                {
+                    CardImplementationUtilities.TransferMemory(infectedCard.player,infectionOwner,Cost);
+                });
+        }
         foreach(Card c in Enemy.field)c.isCanAttack = false;
     }
 }

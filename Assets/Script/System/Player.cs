@@ -123,14 +123,14 @@ public class Player
             if(c.isDaemon == true)
             {
                 c.player.field.Remove(c);
-                c.Destructor(c.player==this ? enemy: this);
+                c.ExecuteDestructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
             }
             else
             {
                 c.player.garbage.Add(c);
                 c.player.field.Remove(c);
-                c.Destructor(c.player==this ? enemy: this);
+                c.ExecuteDestructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
                 c.player.maxMemory -= c.Cost;
                 maxMemory += c.Cost;
@@ -198,7 +198,7 @@ public class Player
                 Player oldOwner = oldScope.player;
                 Player oldEnemy = oldOwner == this ? gm.notrun : this;
 
-                oldScope.Destructor(oldEnemy);
+                oldScope.ExecuteDestructor(oldEnemy);
                 if(!oldOwner.garbage.Contains(oldScope))
                     oldOwner.garbage.Add(oldScope);
                 oldScope.Cost -= oldScope.ChangeCost;

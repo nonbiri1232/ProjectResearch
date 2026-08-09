@@ -83,6 +83,31 @@ public class Card
     public virtual void CrestOnAttack(Player Enemy,List<Card> target = null){}
     public virtual void CrestOnPlay(Player Enemy,Card target = null){}
 
+    private readonly List<Action<Player, List<Card>>> additionalDestructorEffects = new List<Action<Player, List<Card>>>();
+
+    public void AddDestructorEffect(Action<Player, List<Card>> effect)
+    {
+        if (effect != null)
+        {
+            additionalDestructorEffects.Add(effect);
+        }
+    }
+
+    public void ExecuteDestructor(Player enemy, List<Card> target = null)
+    {
+        Destructor(enemy, target);
+
+        // 発動中にリストが変更されても問題が起きないようコピーする
+        Action<Player, List<Card>>[] effects = additionalDestructorEffects.ToArray();
+
+        // 墓地から復活したときに感染効果を残さない
+        additionalDestructorEffects.Clear();
+
+        foreach (Action<Player, List<Card>> effect in effects)
+        {
+            effect(enemy, target);
+        }
+    }
     protected Card RandomSelect(List<Card> target)
     {
         if(target == null || target.Count == 0)return null;
