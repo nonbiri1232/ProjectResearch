@@ -29,7 +29,7 @@ public class Player
     }
     public bool Marigan(List<Card> cards)
     {
-        if(cards == null)
+        if(cards == null||cards.Any(c => c == null)||cards.Distinct().Count() != cards.Count||cards.Any(c => c.player != this || !hand.Contains(c)))
         {
             return false;
         }
@@ -51,7 +51,6 @@ public class Player
     private Card RandomSelect(List<Card> target)
     {
         if(target == null || target.Count == 0)return null;
-        if(target == null)return null;
         int size = target.Count;
         int rnd = rand.Next(0,size);
         return target[rnd];
@@ -117,19 +116,21 @@ public class Player
         {
             return;
         }
+        int destroyedCount = 0;
         foreach(var c in target.Where(c=>c != null).Distinct().ToList())
         {
+            if(c.player == null || !c.player.field.Contains(c)) continue;
             if(c.isDaemon == true)
             {
                 c.player.field.Remove(c);
-                c.Destructor(c.player==this ? enemy: this);
+                c.ExecuteDestructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
             }
             else
             {
                 c.player.garbage.Add(c);
                 c.player.field.Remove(c);
-                c.Destructor(c.player==this ? enemy: this);
+                c.ExecuteDestructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
                 c.player.maxMemory -= c.Cost;
                 maxMemory += c.Cost;
@@ -148,8 +149,9 @@ public class Player
             c.isProxy = c.Proxy;
             c.isSandBox = c.SandBox;
             c.isSegfault = c.Segfault;
+            destroyedCount++;
         }
-        if (isStartPhase && target.Count > 0)
+        if (isStartPhase && destroyedCount > 0)
         {
             DrawG();
         }
@@ -180,8 +182,8 @@ public class Player
     }
     public bool PlayFeild(Card c)
     {
-        if(c== null || field.Contains(c)) return false;
-        usedMemory += c.Cost;
+        if(c== null || field.Contains(c) || gm.currentScope == c) return false;
+        if(!hand.Contains(c)&&!deck.Contains(c)&&!garbage.Contains(c))return false;
         if(c.Type == Card.CardType.Scope)
         {
             if(hand.Contains(c))
@@ -190,8 +192,18 @@ public class Player
                 deck.Remove(c);
             else if(garbage.Contains(c))
                 garbage.Remove(c);
-            if(gm.currentScope != null)
-                gm.currentScope.player.garbage.Add(gm.currentScope);
+            if (gm.currentScope != null)
+            {
+                Card oldScope = gm.currentScope;
+                Player oldOwner = oldScope.player;
+                Player oldEnemy = oldOwner == this ? gm.notrun : this;
+
+                oldScope.ExecuteDestructor(oldEnemy);
+                if(!oldOwner.garbage.Contains(oldScope))
+                    oldOwner.garbage.Add(oldScope);
+                oldScope.Cost -= oldScope.ChangeCost;
+                oldScope.ChangeCost = 0;
+            }
             gm.currentScope = c;
         }
         else
@@ -213,6 +225,7 @@ public class Player
                 fieldCost += c.Cost;
             }
         }
+        usedMemory += c.Cost;
         return true;
     }  
     //カードIDからインスタンスを作成する。
