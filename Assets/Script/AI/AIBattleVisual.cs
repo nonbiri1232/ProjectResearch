@@ -317,8 +317,7 @@ public class AIBattleVisual : MonoBehaviour
 
             if (validTargets.Count == 0)
             {
-                Debug.LogWarning("有効な対象がありません。");
-                pendingPlayCard = null;
+                AskAddCostOrPlay();
                 return;
             }
 
@@ -334,6 +333,7 @@ public class AIBattleVisual : MonoBehaviour
         OpenSelection();
         ClearChildren(selectArea);
         pendingTargets.Clear();
+        CreateCommandButton(selectArea, "決定", ConfirmTargetSelection);
 
         foreach (Card target in validTargets)
         {
@@ -344,13 +344,20 @@ public class AIBattleVisual : MonoBehaviour
             {
                 button.onClick.AddListener(() =>
                 {
-                    if (!pendingTargets.Contains(captured))
+                    if (pendingTargets.Contains(captured))
+                    {
+                        pendingTargets.Remove(captured);
+                        SetSelected(cardObject, captured, false);
+                    }
+                    else
                     {
                         pendingTargets.Add(captured);
-                        SetSelected(cardObject, true);
+                        SetSelected(cardObject, captured, true);
                     }
 
-                    if (pendingTargets.Count >= select.numOfSelect)
+                    int requiredSelections = Mathf.Min(
+                        select.numOfSelect, validTargets.Count);
+                    if (pendingTargets.Count >= requiredSelections)
                     {
                         CloseSelection();
                         AskAddCostOrPlay();
@@ -358,6 +365,12 @@ public class AIBattleVisual : MonoBehaviour
                 });
             }
         }
+    }
+
+    private void ConfirmTargetSelection()
+    {
+        CloseSelection();
+        AskAddCostOrPlay();
     }
 
     private void AskAddCostOrPlay()
@@ -583,7 +596,7 @@ public class AIBattleVisual : MonoBehaviour
                 : new Color(0.75f, 0.75f, 0.75f, 1f);
     }
 
-    private static void ToggleCard(Card card, List<Card> selected, GameObject cardObject)
+    private void ToggleCard(Card card, List<Card> selected, GameObject cardObject)
     {
         bool isSelected;
         if (selected.Contains(card))
@@ -596,16 +609,18 @@ public class AIBattleVisual : MonoBehaviour
             selected.Add(card);
             isSelected = true;
         }
-        SetSelected(cardObject, isSelected);
+        SetSelected(cardObject, card, isSelected);
     }
 
-    private static void SetSelected(GameObject cardObject, bool selected)
+    private void SetSelected(GameObject cardObject, Card card, bool selected)
     {
         Image image = cardObject != null ? cardObject.GetComponent<Image>() : null;
-        if (image != null)
-        {
-            image.color = selected ? Color.gray : Color.white;
-        }
+        if (image == null) return;
+
+        if (selected)
+            image.color = Color.gray;
+        else
+            ApplyCardColor(cardObject, card);
     }
 
     private string GetCardName(Card card)
