@@ -1,5 +1,6 @@
-using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 
 public class TrainingArena : MonoBehaviour
 {
@@ -11,6 +12,7 @@ public class TrainingArena : MonoBehaviour
     [SerializeField] private bool useSavedDecks = false;
 
     private GameManager gm;
+    private bool isStartingNextMatch;
 
     private void Start()
     {
@@ -23,8 +25,17 @@ public class TrainingArena : MonoBehaviour
 
     public void StartNewMatch()
     {
-        List<Card> deckA = BuildDeck(null);
-        List<Card> deckB = BuildDeck(null);
+        isStartingNextMatch = false;
+
+        if (gm != null)
+        {
+            gm.OnGameFinished -= HandleGameFinished;
+        }
+
+        List<Card> deckA = BuildDeck(
+            useSavedDecks ? DeckManager.player1Deck : null);
+        List<Card> deckB = BuildDeck(
+            useSavedDecks ? DeckManager.player2Deck : null);
 
         Player playerA = new Player(deckA);
         Player playerB = new Player(deckB);
@@ -34,10 +45,31 @@ public class TrainingArena : MonoBehaviour
         agentA.Initialize(playerA, playerB, gm);
         agentB.Initialize(playerB, playerA, gm);
 
-        // 対局終了後、次の対局を自動で開始する
-        gm.OnGameFinished += (winner) => StartNewMatch();
+        // Agentが終了報酬を処理した後、次フレームで次の対局を始める。
+        gm.OnGameFinished += HandleGameFinished;
 
-        Debug.Log($"【学習】対局開始！ deckA枚数:{deckA.Count} deckB枚数:{deckB.Count}"); // ←追加
+        Debug.Log($"【学習】対局開始！ deckA枚数:{deckA.Count} deckB枚数:{deckB.Count}");
+    }
+
+    private void HandleGameFinished(Player winner)
+    {
+        if (isStartingNextMatch) return;
+        isStartingNextMatch = true;
+        StartCoroutine(StartNextMatch());
+    }
+
+    private IEnumerator StartNextMatch()
+    {
+        yield return null;
+        StartNewMatch();
+    }
+
+    private void OnDestroy()
+    {
+        if (gm != null)
+        {
+            gm.OnGameFinished -= HandleGameFinished;
+        }
     }
 
     private List<Card> BuildDeck(List<int> deckIds)
@@ -46,8 +78,9 @@ public class TrainingArena : MonoBehaviour
         {
             return DeckManager.CreateBasicCardDeck();
         }
-        return Player.ChangeCard(deckIds.ToArray());
+
+        List<Card> deck = Player.ChangeCard(deckIds.ToArray());
+        // GameManagerは開始時に4枚引くため、5枚未満では初回判定で即終了する。
+        return deck.Count >= 5 ? deck : DeckManager.CreateBasicCardDeck();
     }
-
-
 }

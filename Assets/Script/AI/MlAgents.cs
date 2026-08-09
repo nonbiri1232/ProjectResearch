@@ -1,11 +1,9 @@
-using System.Collections;
-using UnityEngine;
-using Unity.MLAgents;
-using Unity.MLAgents.Sensors;
-using Unity.MLAgents.Actuators;
-using Unity.MLAgents.Policies;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.MLAgents;
+using Unity.MLAgents.Actuators;
+using Unity.MLAgents.Sensors;
 
 public class MlAgents : Agent
 {
@@ -15,14 +13,31 @@ public class MlAgents : Agent
 
     public void Initialize(Player me, Player enemy, GameManager manager)
     {
+        if (gm != null)
+        {
+            gm.OnGameFinished -= HandleGameFinished;
+        }
+
         myPlayer = me;
         enemyPlayer = enemy;
         gm = manager;
-        gm.OnGameFinished += HandleGameFinished;
+        lastTick = manager != null ? manager.decisionTick - 1 : -1;
+
+        if (gm != null)
+        {
+            gm.OnGameFinished += HandleGameFinished;
+        }
     }
 
-    
     private int lastTick = -1;
+
+    private void OnDestroy()
+    {
+        if (gm != null)
+        {
+            gm.OnGameFinished -= HandleGameFinished;
+        }
+    }
 
     private void Update()
     {
@@ -40,6 +55,7 @@ public class MlAgents : Agent
 
     private bool ComputeIsMyTurn()
     {
+        if (gm == null || myPlayer == null || enemyPlayer == null) return false;
         if (gm.currentState != GameState.WaitingForInput) return false;
 
         if (gm.currentPhase == PhaseState.Start && gm.systemTurn == 1)
@@ -56,7 +72,7 @@ public class MlAgents : Agent
 
     private void HandleGameFinished(Player winner)
     {
-        Debug.Log($"【学習】対局終了。勝者: {(winner == myPlayer ? "自分" : "相手")}"); // ←追加
+        Debug.Log($"【学習】対局終了。勝者: {(winner == myPlayer ? "自分" : "相手")}");
         if (winner == myPlayer) AddReward(1.0f);
         else if (winner == enemyPlayer) AddReward(-1.0f);
         EndEpisode();
@@ -65,6 +81,8 @@ public class MlAgents : Agent
 
     public override void WriteDiscreteActionMask(IDiscreteActionMask actionMask)
     {
+        if (gm == null || myPlayer == null || enemyPlayer == null) return;
+
         if (gm.currentPhase == PhaseState.Start)
         {
             if (gm.systemTurn == 1)
@@ -89,21 +107,33 @@ public class MlAgents : Agent
             actionMask.SetActionEnabled(0, (int)ActionType.Marigan, false);
             actionMask.SetActionEnabled(0, (int)ActionType.SelfGarbage, false);
 
-            // 手札が0枚なら「Play」をそもそも選べないようにする
-            if (myPlayer.hand.Count == 0)
+            // 実行可能なカードや攻撃元がない行動は選ばせない。
+            if (!myPlayer.hand.Exists(HasBasicPlayRequirements))
                 actionMask.SetActionEnabled(0, (int)ActionType.Play, false);
 
-            // 自分の場にカードが0枚なら「Attack」をそもそも選べないようにする
-            if (myPlayer.field.Count == 0)
+            if (!HasAnyLegalAttack())
                 actionMask.SetActionEnabled(0, (int)ActionType.Attack, false);
         }
 
-        int handLimit = Mathf.Max(myPlayer.hand.Count, 1);
-        for (int i = handLimit; i < 8; i++)
-            actionMask.SetActionEnabled(1, i, false);
+        bool hasPlayableCard = myPlayer.hand.Exists(HasBasicPlayRequirements);
+        for (int i = 0; i < 8; i++)
+        {
+            bool inHand = i < myPlayer.hand.Count;
+            bool validPlayIndex = inHand && HasBasicPlayRequirements(myPlayer.hand[i]);
 
-        int myFieldLimit = Mathf.Max(myPlayer.field.Count, 1);
-        for (int i = myFieldLimit; i < 20; i++)
+            // MainでPlay候補がある場合だけ、プレイ不能な手札インデックスを除外する。
+            // 候補がない場合はBranch全無効を避けるため0番をダミーとして残す。
+            if (!inHand || (gm.currentPhase == PhaseState.Main &&
+                hasPlayableCard && !validPlayIndex))
+            {
+                if (i != 0 || myPlayer.hand.Count > 0)
+                    actionMask.SetActionEnabled(1, i, false);
+            }
+        }
+
+        // Branch 2は自分の場と、where.handの対象選択で共用する。
+        int selfTargetLimit = Mathf.Max(Mathf.Max(myPlayer.field.Count, myPlayer.hand.Count), 1);
+        for (int i = selfTargetLimit; i < 20; i++)
             actionMask.SetActionEnabled(2, i, false);
 
         int enemyFieldLimit = Mathf.Max(enemyPlayer.field.Count, 1);
@@ -113,6 +143,8 @@ public class MlAgents : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
+        if (myPlayer == null || enemyPlayer == null) return;
+
         //Agentの情報
         sensor.AddObservation(myPlayer.maxMemory);
         sensor.AddObservation(myPlayer.fieldCost);
@@ -213,13 +245,21 @@ public class MlAgents : Agent
     //
     //   Branch 0     (5) : ActionType  0=Marigan, 1=SelfGarbage, 2=Play, 3=Attack, 4=End
     //   Branch 1     (8) : 手札インデックス        (Play の対象選択に使用)
-    //   Branch 2     (20): 自分の場インデックス     (Attack の攻撃元 / Play の対象が selfField の場合)
+    //   Branch 2     (20): 自分側インデックス       (Attack元 / Play対象がselfField・handの場合)
     //   Branch 3     (20): 相手の場インデックス     (Attack の対象 / Play の対象が enemyField の場合)
-    //   Branch 4~7   (2 x4) : 手札マスク  [i]=1なら手札のi番目をMariganの対象に含める(初手4枚固定)
+    //   Branch 4~7   (2 x4) : マリガン手札マスク。Main時はBranch 4を追加コスト選択に再利用
     //   Branch 8~27  (2 x20): 場マスク    [i]=1なら自分の場のi番目をSelfGarbageの対象に含める
     public override void OnActionReceived(ActionBuffers actions)
     {
+        if (!ComputeIsMyTurn()) return;
+
         var d = actions.DiscreteActions;
+        if (d.Length < 28)
+        {
+            Debug.LogError("MlAgentsには28個のDiscrete Branchが必要です。");
+            AddReward(-0.05f);
+            return;
+        }
 
         int actionTypeIndex = d[0];
         int handIndex       = d[1];
@@ -266,9 +306,10 @@ public class MlAgents : Agent
             case ActionType.Play:
             {
                 // 手札からカードをプレイする(対象は単一のためBranch1をそのまま使用)
-                if (handIndex < myPlayer.hand.Count)
+                if (handIndex >= 0 && handIndex < myPlayer.hand.Count)
                 {
                     Card sourceCard = myPlayer.hand[handIndex];
+                    if (!HasBasicPlayRequirements(sourceCard)) break;
                     List<Card> target = null;
 
                     // カードごとの Select 情報にあわせて対象を決定する
@@ -281,7 +322,8 @@ public class MlAgents : Agent
                         {
                             case where.hand:
                                 pool = myPlayer.hand;
-                                targetIndex = handIndex;
+                                // Branch 1はプレイ元なので、手札対象はBranch 2で選ぶ。
+                                targetIndex = myFieldIndex;
                                 break;
                             case where.selfField:
                                 pool = myPlayer.field;
@@ -293,17 +335,29 @@ public class MlAgents : Agent
                                 break;
                         }
 
-                        if (pool != null && targetIndex >= 0 && targetIndex < pool.Count)
+                        if (pool == null || targetIndex < 0 || targetIndex >= pool.Count)
                         {
-                            target = new List<Card>() { pool[targetIndex] };
+                            break;
+                        }
+
+                        target = new List<Card>() { pool[targetIndex] };
+                        if (!sourceCard.ValidateTargets(myPlayer, enemyPlayer, target))
+                        {
+                            break;
                         }
                     }
 
-                    // targetがnullの場合、4引数コンストラクタはAddRange(null)で例外になるため
-                    // ターゲット不要な2引数コンストラクタに分岐する
-                    playerAction = (target != null)
+                    if (sourceCard.select != null && sourceCard.select.isSelectConstructor && target == null)
+                    {
+                        break;
+                    }
+
+                    playerAction = target != null
                         ? new PlayerAction(ActionType.Play, sourceCard, target)
                         : new PlayerAction(ActionType.Play, sourceCard);
+
+                    // Mainでは未使用のBranch 4を追加コスト選択として再利用する。
+                    playerAction.isAddCost = d[4] == 1 && CanPayAdditionalCost(sourceCard);
                 }
                 break;
             }
@@ -311,20 +365,30 @@ public class MlAgents : Agent
             case ActionType.Attack:
             {
                 // 自分の場のカードで攻撃する(対象は単一のためBranch2/3をそのまま使用)
-                if (myFieldIndex < myPlayer.field.Count)
+                if (myFieldIndex >= 0 && myFieldIndex < myPlayer.field.Count)
                 {
                     Card sourceCard = myPlayer.field[myFieldIndex];
-                    List<Card> target = null;
+                    if (!IsPotentialAttacker(sourceCard)) break;
 
-                    // 相手の場にカードがあれば対象として指定。いなければ直接攻撃(target=null)。
-                    if (enemyPlayer.field.Count > 0 && enemyFieldIndex < enemyPlayer.field.Count)
+                    List<Card> validTargets = GetValidAttackTargets();
+                    bool enemyHasObjects = enemyPlayer.field.Exists(
+                        card => card.Type == Card.CardType.Object);
+                    if (!enemyHasObjects)
                     {
-                        target = new List<Card>() { enemyPlayer.field[enemyFieldIndex] };
+                        // GameManagerの仕様上、初ターン中はImmediateでも直接攻撃できない。
+                        if (!sourceCard.isFirstTurn)
+                            playerAction = new PlayerAction(ActionType.Attack, sourceCard);
                     }
-
-                    playerAction = (target != null)
-                        ? new PlayerAction(ActionType.Attack, sourceCard, target)
-                        : new PlayerAction(ActionType.Attack, sourceCard);
+                    else if (validTargets.Count > 0 &&
+                             enemyFieldIndex >= 0 && enemyFieldIndex < enemyPlayer.field.Count)
+                    {
+                        Card selectedTarget = enemyPlayer.field[enemyFieldIndex];
+                        if (validTargets.Contains(selectedTarget))
+                        {
+                            playerAction = new PlayerAction(
+                                ActionType.Attack, sourceCard, new List<Card>() { selectedTarget });
+                        }
+                    }
                 }
                 break;
             }
@@ -344,23 +408,116 @@ public class MlAgents : Agent
             return;
         }
 
+        int tickBeforeAction = gm.decisionTick;
         bool isCorrect = gm.ExecuteAction(myPlayer, enemyPlayer, playerAction);
 
-        Debug.Log($"【Action】{gameObject.name} type:{actionType} isCorrect:{isCorrect}"); // ←追加log用
+        // GameManagerの早期return経路でも、次の判断要求が止まらないようにする。
+        if (!isCorrect && gm.currentState == GameState.WaitingForInput &&
+            gm.decisionTick == tickBeforeAction)
+        {
+            gm.decisionTick++;
+        }
+
+        Debug.Log($"【Action】{gameObject.name} type:{actionType} isCorrect:{isCorrect}");
 
         if (!isCorrect)
         {
             // ルール上実行できない行動を選んだ場合のペナルティ
             AddReward(-0.05f);
         }
-        else
+        else if (gm.currentState != GameState.Finished)
         {
-            // 行動が成立したことに対する小さな報酬
-            AddReward(0.01f);
+            // 有効行動の反復で報酬を稼ぐことを防ぎ、短い手数での勝利を促す。
+            AddReward(-0.001f);
         }
 
         // 勝敗による最終報酬(+1 / -1)は GameManager.OnGameFinished イベント側で
         // AddReward() と EndEpisode() を呼ぶ設計を想定しています。
+    }
+
+    private bool HasBasicPlayRequirements(Card card)
+    {
+        if (card == null || !myPlayer.hand.Contains(card)) return false;
+
+        bool ignoreAssert = myPlayer.field.Exists(c => c is ForcedDebugMode);
+        if (myPlayer.fieldCost + card.Cost > myPlayer.maxMemory) return false;
+        if (myPlayer.usedMemory + card.Cost > myPlayer.usableMemory) return false;
+        if (card.isAssert && !ignoreAssert && myPlayer.maxMemory > card.Assert) return false;
+        if (card is DeepArchive && myPlayer.garbage.Count < 10) return false;
+
+        return HasAnyValidTarget(card);
+    }
+
+    private bool HasAnyValidTarget(Card card)
+    {
+        if (card.select == null || !card.select.isSelectConstructor) return true;
+
+        List<Card> pool = null;
+        switch (card.select.whereTarget)
+        {
+            case where.hand:
+                pool = myPlayer.hand;
+                break;
+            case where.selfField:
+                pool = myPlayer.field;
+                break;
+            case where.enemyField:
+                pool = enemyPlayer.field;
+                break;
+        }
+
+        if (pool == null) return false;
+        foreach (Card candidate in pool)
+        {
+            if (card.ValidateTargets(
+                myPlayer, enemyPlayer, new List<Card>() { candidate }))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool CanPayAdditionalCost(Card card)
+    {
+        return card != null &&
+               card.Type == Card.CardType.Object &&
+               myPlayer.fieldCost + card.Cost + 1 <= myPlayer.maxMemory &&
+               myPlayer.usedMemory + card.Cost + 1 <= myPlayer.usableMemory;
+    }
+
+    private static bool IsPotentialAttacker(Card card)
+    {
+        return card != null &&
+               card.Type == Card.CardType.Object &&
+               card.isCanAttack &&
+               (!card.isFirstTurn || card.isImmediate) &&
+               card.isAttacked < card.attackTimes;
+    }
+
+    private bool HasAnyLegalAttack()
+    {
+        bool enemyHasObjects = enemyPlayer.field.Exists(
+            card => card.Type == Card.CardType.Object);
+        List<Card> validTargets = GetValidAttackTargets();
+
+        foreach (Card attacker in myPlayer.field)
+        {
+            if (!IsPotentialAttacker(attacker)) continue;
+            if (enemyHasObjects && validTargets.Count > 0) return true;
+            if (!enemyHasObjects && !attacker.isFirstTurn) return true;
+        }
+        return false;
+    }
+
+    private List<Card> GetValidAttackTargets()
+    {
+        List<Card> objects = enemyPlayer.field.FindAll(
+            card => card.Type == Card.CardType.Object);
+        bool hasProxy = objects.Exists(card => card.isProxy);
+
+        return objects.FindAll(card =>
+            !card.isEncrypted && (!hasProxy || card.isProxy));
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
@@ -368,36 +525,32 @@ public class MlAgents : Agent
         var d = actionsOut.DiscreteActions;
         for (int i = 0; i < d.Length; i++) d[i] = 0;
 
-        // フェーズに応じたデフォルト行動を決める(キー未入力時の安全策)
-        int actionType;
-        if (gm.currentPhase == PhaseState.Start)
-        {
-            // 初手マリガン中はMarigan、それ以降のStart(自壊フェーズ)はSelfGarbage
-            actionType = (gm.systemTurn == 1) ? 0 : 1;
-        }
-        else
-        {
-            // メインフェーズはEndをデフォルトにする(無難にターンを終える)
-            actionType = 4;
-        }
+        if (gm == null) return;
+
+        int actionType = gm.currentPhase == PhaseState.Start
+            ? (gm.systemTurn == 1 ? 0 : 1)
+            : 4;
+        Keyboard keyboard = Keyboard.current;
 
         // 1:Marigan 2:SelfGarbage 3:Play 4:Attack 5:End
-        if (Keyboard.current.digit1Key.isPressed) actionType = 0;
-        else if (Keyboard.current.digit2Key.isPressed) actionType = 1;
-        else if (Keyboard.current.digit3Key.isPressed) actionType = 2;
-        else if (Keyboard.current.digit4Key.isPressed) actionType = 3;
-        else if (Keyboard.current.digit5Key.isPressed) actionType = 4;
+        if (keyboard != null)
+        {
+            if (keyboard.digit1Key.isPressed) actionType = 0;
+            else if (keyboard.digit2Key.isPressed) actionType = 1;
+            else if (keyboard.digit3Key.isPressed) actionType = 2;
+            else if (keyboard.digit4Key.isPressed) actionType = 3;
+            else if (keyboard.digit5Key.isPressed) actionType = 4;
+        }
         d[0] = actionType;
 
         int handIndex = 0;
-        if (Keyboard.current.wKey.isPressed) handIndex = 1;
-        else if (Keyboard.current.eKey.isPressed) handIndex = 2;
-        else if (Keyboard.current.rKey.isPressed) handIndex = 3;
+        if (keyboard != null && keyboard.wKey.isPressed) handIndex = 1;
+        else if (keyboard != null && keyboard.eKey.isPressed) handIndex = 2;
+        else if (keyboard != null && keyboard.rKey.isPressed) handIndex = 3;
         d[1] = handIndex;
 
         d[2] = 0;
         d[3] = 0;
         Debug.Log($"【Heuristic】{gameObject.name} actionType:{actionType} handIndex:{handIndex}");
     }
-
 }

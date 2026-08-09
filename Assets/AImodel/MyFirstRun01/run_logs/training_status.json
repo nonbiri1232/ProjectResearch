@@ -1,0 +1,29 @@
+{
+    "CardGame": {
+        "checkpoints": [
+            {
+                "steps": 3218,
+                "file_path": "results\\MyFirstRun01\\CardGame\\CardGame-3218.onnx",
+                "reward": -0.6821470602470285,
+                "creation_time": 1786300771.58614,
+                "auxillary_file_paths": [
+                    "results\\MyFirstRun01\\CardGame\\CardGame-3218.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 3218,
+            "file_path": "results\\MyFirstRun01\\CardGame.onnx",
+            "reward": -0.6821470602470285,
+            "creation_time": 1786300771.58614,
+            "auxillary_file_paths": [
+                "results\\MyFirstRun01\\CardGame\\CardGame-3218.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.2.0.dev0",
+        "torch_version": "2.1.2+cpu"
+    }
+}
