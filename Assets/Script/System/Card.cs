@@ -46,6 +46,7 @@ public class Card
     public bool isSegfault{get;set;}
     public bool isEncrypted{get;set;}
     public bool isImmediate{get;set;}
+    public bool wasPlayedFromGarbage{get;set;}
     public int attackTimes{get;protected set;} = 1;
     public bool isAssert{get;protected set;}
     public int Assert{get;protected set;}
@@ -58,7 +59,7 @@ public class Card
     public int Attack{get; set;}
     public int ChangeHp = 0;
     public int Hp{get;set;}
-    private Random rand = new Random();
+    private static readonly Random rand = new Random();
     public void OnPlay()
     {
         Daemon = isDaemon;
@@ -69,6 +70,7 @@ public class Card
         Segfault = isSegfault;
     }
     public virtual bool AddCost(Player Enemy,List<Card> target = null){return true;}
+    public virtual bool ValidateTargets(Player move, Player enemy, List<Card> targets){return true;}
     public virtual void Constructor(Player Enemy,List<Card> target = null){}
     public virtual void Destructor(Player Enemy,List<Card> target = null){}
     public virtual bool IsFailSafe(){return false;}
@@ -78,15 +80,40 @@ public class Card
     public virtual void OnAttack(Player Enemy,Card target = null){}
     public virtual void StartPhase(Player Enemy){}
     public virtual void EndPhase(Player Enemy){}
+    public virtual void OpponentEndPhase(Player Enemy){}
     public virtual void ScopeEffectOnAttack(Player pl,List<Card> target = null){}
     public virtual void ScopeEffectOnPlay(Player pl,Card target = null){}
     public virtual void CrestOnAttack(Player Enemy,List<Card> target = null){}
     public virtual void CrestOnPlay(Player Enemy,Card target = null){}
 
+    private readonly List<Action<Player, List<Card>>> additionalDestructorEffects = new List<Action<Player, List<Card>>>();
+
+    public void AddDestructorEffect(Action<Player, List<Card>> effect)
+    {
+        if (effect != null)
+        {
+            additionalDestructorEffects.Add(effect);
+        }
+    }
+
+    public void ExecuteDestructor(Player enemy, List<Card> target = null)
+    {
+        Destructor(enemy, target);
+
+        // 発動中にリストが変更されても問題が起きないようコピーする
+        Action<Player, List<Card>>[] effects = additionalDestructorEffects.ToArray();
+
+        // 墓地から復活したときに感染効果を残さない
+        additionalDestructorEffects.Clear();
+
+        foreach (Action<Player, List<Card>> effect in effects)
+        {
+            effect(enemy, target);
+        }
+    }
     protected Card RandomSelect(List<Card> target)
     {
         if(target == null || target.Count == 0)return null;
-        if(target == null)return null;
         int size = target.Count;
         int rnd = rand.Next(0,size);
         return target[rnd];
@@ -119,6 +146,38 @@ public class Card
             case 11: return "SystemFreeze";
             case 12: return "CarnelPanicZero";
             case 13: return "AllDelete";
+            case 14: return "SafeModeOverdrive";
+            case 15: return "ForcedCrashTest";
+            case 16: return "IllegalResourceSale";
+            case 17: return "ForcedDebugMode";
+            case 18: return "RansomwareInfection";
+            case 19: return "LeechProcess";
+            case 20: return "DDoSArea";
+            case 21: return "MultiEncryptionProtocol";
+            case 22: return "TimedLogicBomb";
+            case 23: return "TrojanHorse";
+            case 24: return "MemoryDumpRestore";
+            case 25: return "CoreDumpProcess";
+            case 26: return "ZombieProcess";
+            case 27: return "DeepArchive";
+            case 28: return "RestoreMeister";
+            case 29: return "FakeHoneypot";
+            case 30: return "PingBot";
+            case 31: return "Firewall";
+            case 32: return "DebugProcess";
+            case 33: return "BackupServer";
+            case 34: return "GarbageShredder";
+            case 35: return "Antivirus";
+            case 36: return "Mainframe";
+            case 37: return "DataFetch";
+            case 38: return "ProcessKill";
+            case 39: return "EmergencyEvasion";
+            case 40: return "Override";
+            case 41: return "CacheClear";
+            case 42: return "Format";
+            case 43: return "ApplyPatch";
+            case 44: return "EmergencyPower";
+            case 45: return "ForgedFile";
             default:
                 return null;
         }
@@ -141,12 +200,45 @@ public class Card
             case "SystemFreeze": return 11;
             case "CarnelPanicZero": return 12;
             case "AllDelete": return 13;
+            case "SafeModeOverdrive": return 14;
+            case "ForcedCrashTest": return 15;
+            case "IllegalResourceSale": return 16;
+            case "ForcedDebugMode": return 17;
+            case "RansomwareInfection": return 18;
+            case "LeechProcess": return 19;
+            case "DDoSArea": return 20;
+            case "MultiEncryptionProtocol": return 21;
+            case "TimedLogicBomb": return 22;
+            case "TrojanHorse": return 23;
+            case "MemoryDumpRestore": return 24;
+            case "CoreDumpProcess": return 25;
+            case "ZombieProcess": return 26;
+            case "DeepArchive": return 27;
+            case "RestoreMeister": return 28;
+            case "FakeHoneypot": return 29;
+            case "PingBot": return 30;
+            case "Firewall": return 31;
+            case "DebugProcess": return 32;
+            case "BackupServer": return 33;
+            case "GarbageShredder": return 34;
+            case "Antivirus": return 35;
+            case "Mainframe": return 36;
+            case "DataFetch": return 37;
+            case "ProcessKill": return 38;
+            case "EmergencyEvasion": return 39;
+            case "Override": return 40;
+            case "CacheClear": return 41;
+            case "Format": return 42;
+            case "ApplyPatch": return 43;
+            case "EmergencyPower": return 44;
+            case "ForgedFile": return 45;
             default:
                 return -1;
         }
     }
     public static int GetCardId(Card c)
     {
+        if(c == null)return -1;
         string className = c.GetType().Name;
         switch (className)
         {
@@ -164,31 +256,45 @@ public class Card
             case "SystemFreeze": return 11;
             case "CarnelPanicZero": return 12;
             case "AllDelete": return 13;
+            case "SafeModeOverdrive": return 14;
+            case "ForcedCrashTest": return 15;
+            case "IllegalResourceSale": return 16;
+            case "ForcedDebugMode": return 17;
+            case "RansomwareInfection": return 18;
+            case "LeechProcess": return 19;
+            case "DDoSArea": return 20;
+            case "MultiEncryptionProtocol": return 21;
+            case "TimedLogicBomb": return 22;
+            case "TrojanHorse": return 23;
+            case "MemoryDumpRestore": return 24;
+            case "CoreDumpProcess": return 25;
+            case "ZombieProcess": return 26;
+            case "DeepArchive": return 27;
+            case "RestoreMeister": return 28;
+            case "FakeHoneypot": return 29;
+            case "PingBot": return 30;
+            case "Firewall": return 31;
+            case "DebugProcess": return 32;
+            case "BackupServer": return 33;
+            case "GarbageShredder": return 34;
+            case "Antivirus": return 35;
+            case "Mainframe": return 36;
+            case "DataFetch": return 37;
+            case "ProcessKill": return 38;
+            case "EmergencyEvasion": return 39;
+            case "Override": return 40;
+            case "CacheClear": return 41;
+            case "Format": return 42;
+            case "ApplyPatch": return 43;
+            case "EmergencyPower": return 44;
+            case "ForgedFile": return 45;
             default:
                 return -1;
         }
     }
     public static Card CreateCardInstance(string className)
     {
-        switch (className)
-        {
-            case "SledOverClock": return new SledOverClock();
-            case "IncrementProcess": return new IncrementProcess();
-            case "ClockDownBot": return new ClockDownBot();
-            case "ParallelCompilation": return new ParallelCompilation();
-            case "PoisonPoint": return new PoisonPoint();
-            case "UnSafeArea": return new UnSafeArea();
-            case "Master": return new Master();
-            case "Raid10": return new Raid10();
-            case "RmRf": return new RmRf();
-            case "Paging": return new Paging();
-            case "BackGroundMiner": return new BackGroundMiner();
-            case "SystemFreeze": return new SystemFreeze();
-            case "CarnelPanicZero": return new CarnelPanicZero();
-            case "AllDelete": return new AllDelete();
-            default:
-                return null;
-        }
+        return CreateCardInstance(GetCardId(className));
     }
     public static Card CreateCardInstance(int cardId)
     {
@@ -208,6 +314,38 @@ public class Card
             case 11: return new SystemFreeze();
             case 12: return new CarnelPanicZero();
             case 13: return new AllDelete();
+            case 14: return new SafeModeOverdrive();
+            case 15: return new ForcedCrashTest();
+            case 16: return new IllegalResourceSale();
+            case 17: return new ForcedDebugMode();
+            case 18: return new RansomwareInfection();
+            case 19: return new LeechProcess();
+            case 20: return new DDoSArea();
+            case 21: return new MultiEncryptionProtocol();
+            case 22: return new TimedLogicBomb();
+            case 23: return new TrojanHorse();
+            case 24: return new MemoryDumpRestore();
+            case 25: return new CoreDumpProcess();
+            case 26: return new ZombieProcess();
+            case 27: return new DeepArchive();
+            case 28: return new RestoreMeister();
+            case 29: return new FakeHoneypot();
+            case 30: return new PingBot();
+            case 31: return new Firewall();
+            case 32: return new DebugProcess();
+            case 33: return new BackupServer();
+            case 34: return new GarbageShredder();
+            case 35: return new Antivirus();
+            case 36: return new Mainframe();
+            case 37: return new DataFetch();
+            case 38: return new ProcessKill();
+            case 39: return new EmergencyEvasion();
+            case 40: return new Override();
+            case 41: return new CacheClear();
+            case 42: return new Format();
+            case 43: return new ApplyPatch();
+            case 44: return new EmergencyPower();
+            case 45: return new ForgedFile();
             default:
                 return null;
         }

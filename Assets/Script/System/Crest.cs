@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 public class Crest
 {
@@ -32,16 +33,18 @@ public class Crest
     public void OnAttack(Card source,Card target)
     {
         var list = new List<Card>(){source,target};
-        foreach(var c in effectOnAttack)
+        foreach(var c in effectOnAttack.ToList())
         {
+            if(c.player != turn)continue;
             c.CrestOnAttack(noTurn,list);
         }
     }
 
     public void OnPlay(Card play)
     {
-        foreach(var c in effectOnPlay)
+        foreach(var c in effectOnPlay.ToList())
         {
+            if(c.player != turn)continue;
             c.CrestOnPlay(noTurn,play);
         }
     }

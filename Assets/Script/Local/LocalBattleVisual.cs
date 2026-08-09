@@ -80,6 +80,21 @@ public class LocalBattleVisual : MonoBehaviour
         MariganField.SetActive(true);
         endGame.SetActive(false);
     }
+    private void ApplyCardColor(GameObject cardObject, Card card)
+    {
+        Image image = cardObject.GetComponent<Image>();
+        if(image == null || card == null)return;
+
+        if(card.Type == Card.CardType.Method)
+            image.color = new Color(0.65f, 0.82f, 1f, 1f);
+        else if(card.Type == Card.CardType.Scope)
+            image.color = new Color(1f, 0.68f, 0.68f, 1f);
+        else
+            image.color = card.isCanAttack
+                ? Color.white
+                : new Color(0.75f, 0.75f, 0.75f, 1f);
+    }
+
     public void EndGame(bool iswin)
     {
         endGame.SetActive(true);
@@ -135,6 +150,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             Button btn = cardObj.GetComponent<Button>();
             int targetIndex = index;
@@ -151,7 +167,7 @@ public class LocalBattleVisual : MonoBehaviour
         {
             selfGarbageList.Remove(c);        
             selfGarbageIndexList.Remove(index);
-            img.color = Color.white;
+            ApplyCardColor(obj, c);
         }
         else
         {
@@ -240,6 +256,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             Button btn = cardObj.GetComponent<Button>();
 
@@ -258,8 +275,8 @@ public class LocalBattleVisual : MonoBehaviour
         Image img = obj.GetComponent<Image>();
         if (marigan.Contains(c))
         {
-            marigan.Remove(c);        
-            img.color = Color.white;
+            marigan.Remove(c);
+            ApplyCardColor(obj, Card.CreateCardInstance(c));
         }
         else
         {
@@ -286,6 +303,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
             if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
@@ -317,6 +335,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
             if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
@@ -375,6 +394,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             Button btn = cardObj.GetComponent<Button>();
             int targetIndex = index;
@@ -420,6 +440,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
             if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
@@ -538,6 +559,7 @@ public class LocalBattleVisual : MonoBehaviour
             TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
             btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}\nATK:{c.Attack} HP:{c.Hp}"; 
+            ApplyCardColor(cardObj, c);
 
             Button btn = cardObj.GetComponent<Button>();
 
@@ -555,7 +577,7 @@ public class LocalBattleVisual : MonoBehaviour
             selectNum--;
             selectList.Remove(c);
             selectIndexList.Remove(fieldIndex);       
-            img.color = Color.white;
+            ApplyCardColor(obj, c);
         }
         else
         {
@@ -602,6 +624,7 @@ public class LocalBattleVisual : MonoBehaviour
         TextMeshProUGUI btnText = cardObj.GetComponentInChildren<TextMeshProUGUI>();
             
         btnText.text = $"Cost:{c.Cost}\n{GetCardName(c)}"; 
+        ApplyCardColor(cardObj, c);
 
         EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
         if(trigger == null) trigger = cardObj.AddComponent<EventTrigger>();

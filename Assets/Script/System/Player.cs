@@ -27,8 +27,12 @@ public class Player
         }
         rand = new Random();
     }
-    public void Marigan(List<Card> cards)
+    public bool Marigan(List<Card> cards)
     {
+        if(cards == null||cards.Any(c => c == null)||cards.Distinct().Count() != cards.Count||cards.Any(c => c.player != this || !hand.Contains(c)))
+        {
+            return false;
+        }
         Draw(cards.Count);
         foreach(var c in cards)
         {
@@ -36,6 +40,7 @@ public class Player
             deck.Add(c);
         }
         Shuffle();
+        return true;
     }
     public void DirectAttack(Player enemy,Card attacker)
     {
@@ -45,6 +50,7 @@ public class Player
 
     private Card RandomSelect(List<Card> target)
     {
+        if(target == null || target.Count == 0)return null;
         int size = target.Count;
         int rnd = rand.Next(0,size);
         return target[rnd];
@@ -110,19 +116,21 @@ public class Player
         {
             return;
         }
-        foreach(var c in target.ToList())
+        int destroyedCount = 0;
+        foreach(var c in target.Where(c=>c != null).Distinct().ToList())
         {
+            if(c.player == null || !c.player.field.Contains(c)) continue;
             if(c.isDaemon == true)
             {
                 c.player.field.Remove(c);
-                c.Destructor(c.player==this ? enemy: this);
+                c.ExecuteDestructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
             }
             else
             {
                 c.player.garbage.Add(c);
                 c.player.field.Remove(c);
-                c.Destructor(c.player==this ? enemy: this);
+                c.ExecuteDestructor(c.player==this ? enemy: this);
                 c.player.fieldCost -= c.Cost;
                 c.player.maxMemory -= c.Cost;
                 maxMemory += c.Cost;
@@ -141,10 +149,9 @@ public class Player
             c.isProxy = c.Proxy;
             c.isSandBox = c.SandBox;
             c.isSegfault = c.Segfault;
-            
-            OnFailSafeTriggered?.Invoke(c);
+            destroyedCount++;
         }
-        if (isStartPhase && target.Count > 0)
+        if (isStartPhase && destroyedCount > 0)
         {
             DrawG();
         }
@@ -156,9 +163,10 @@ public class Player
         c.Cost = 0;
         field.Add(c);
         deck.Remove(c);
-        c.Constructor(enemy);
         c.OnPlay();
         c.FailSafe(enemy);
+        //カードのフェイルセーフ側でコンストラクタを呼び出す。
+        OnFailSafeTriggered?.Invoke(c);
     }
 
     public void DrawG()
@@ -172,20 +180,58 @@ public class Player
         garbage.Remove(c);
         hand.Add(c);
     }
-    public void PlayFeild(Card c)
+    public bool PlayFeild(Card c, bool consumeUsableMemory = true)
     {
-        usedMemory += c.Cost;
+        if(c== null || field.Contains(c) || gm.currentScope == c) return false;
+        if(!hand.Contains(c)&&!deck.Contains(c)&&!garbage.Contains(c))return false;
+        c.wasPlayedFromGarbage = garbage.Contains(c);
         if(c.Type == Card.CardType.Scope)
         {
-            hand.Remove(c);
+            if(hand.Contains(c))
+                hand.Remove(c);
+            else if(deck.Contains(c))
+                deck.Remove(c);
+            else if(garbage.Contains(c))
+                garbage.Remove(c);
+            if (gm.currentScope != null)
+            {
+                Card oldScope = gm.currentScope;
+                Player oldOwner = oldScope.player;
+                Player oldEnemy = oldOwner == this ? gm.notrun : this;
+
+                oldScope.ExecuteDestructor(oldEnemy);
+                if(!oldOwner.garbage.Contains(oldScope))
+                    oldOwner.garbage.Add(oldScope);
+                oldScope.Cost -= oldScope.ChangeCost;
+                oldScope.ChangeCost = 0;
+            }
             gm.currentScope = c;
         }
         else
-        {            
-            field.Add(c);
-            fieldCost += c.Cost;
-            hand.Remove(c);
+        {
+            if (hand.Contains(c))
+            {
+                hand.Remove(c);   
+                field.Add(c);
+                fieldCost += c.Cost;
+            }
+            else if(deck.Contains(c)){
+                deck.Remove(c);
+                field.Add(c);
+                fieldCost += c.Cost;
+            }
+            else if(garbage.Contains(c)){
+                garbage.Remove(c);
+                field.Add(c);
+                fieldCost += c.Cost;
+            }
         }
+        if(consumeUsableMemory)
+        {
+            usedMemory += c.Cost;
+        }
+
+        return true;
     }  
     //カードIDからインスタンスを作成する。
     public static List<Card> ChangeCard(int[] deckData)
@@ -194,6 +240,7 @@ public class Player
         foreach(int i in deckData)
         {
             Card c = Card.CreateCardInstance(i);
+            if(c==null)continue;
             deck.Add(c);
         }
         return deck;
@@ -204,10 +251,12 @@ public class Player
         foreach(CardData data in deckData)
         {
             Card c = Card.CreateCardInstance(data.id);
+            if(c==null)continue;
             deck.Add(c);
             c.Attack = data.atk;
             c.Hp = data.hp;
             c.Cost = data.cost;
+            c.isCanAttack = data.canAttackNow;
         }
         return deck;
     }
