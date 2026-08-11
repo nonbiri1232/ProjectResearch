@@ -7,7 +7,7 @@ using Unity.MLAgents.Policies;
 
 /// <summary>
 /// 人間対学習済みML-Agentsのオフライン対戦を管理する。
-/// HumanはDeck1、AIはDeck2を使用する。
+/// 人間は保存済みDeck1、AIは指定された候補デッキからランダムに使用する。
 /// </summary>
 public class AIBattleManager : MonoBehaviour
 {
@@ -18,6 +18,12 @@ public class AIBattleManager : MonoBehaviour
     [Header("Deck")]
     [SerializeField] private bool useSavedDecks = true;
     [SerializeField] private bool useBasicDeckWhenInvalid = true;
+
+    [Header("AI Deck Pool")]
+    [Tooltip("AIに使用させるデッキを登録したカタログ")]
+    [SerializeField] private AIDeckCatalog aiDeckCatalog;
+    [Tooltip("AIへ渡す候補デッキID。空ならカタログ内の全デッキが候補")]
+    [SerializeField] private List<int> aiDeckIds = new List<int>();
 
     [Header("Turn")]
     [SerializeField] private bool randomizeFirstPlayer;
@@ -84,8 +90,11 @@ public class AIBattleManager : MonoBehaviour
 
         List<Card> humanDeck = BuildDeck(
             useSavedDecks ? DeckManager.player1Deck : null);
-        List<Card> aiDeck = BuildDeck(
-            useSavedDecks ? DeckManager.player2Deck : null);
+        List<Card> aiDeck = BuildAIDeck(out int selectedAIDeckId);
+
+        Debug.Log(selectedAIDeckId >= 0
+            ? $"【AIデッキ選択】Deck ID: {selectedAIDeckId}"
+            : "【AIデッキ選択】フォールバックデッキを使用します。");
 
         humanPlayer = new Player(humanDeck);
         aiPlayer = new Player(aiDeck);
@@ -104,6 +113,19 @@ public class AIBattleManager : MonoBehaviour
         NotifyBoardChanged();
     }
 
+    private List<Card> BuildAIDeck(out int selectedDeckId)
+    {
+        if (aiDeckCatalog != null &&
+            aiDeckCatalog.TryCreateRandomDeck(aiDeckIds, out List<Card> deck,
+                out selectedDeckId))
+        {
+            return deck;
+        }
+
+        selectedDeckId = -1;
+        return BuildDeck(useSavedDecks ? DeckManager.player2Deck : null);
+    }
+
     private List<Card> BuildDeck(List<int> ids)
     {
         if (ids != null && ids.Count > 0)
@@ -118,7 +140,7 @@ public class AIBattleManager : MonoBehaviour
         }
 
         throw new InvalidOperationException(
-            "AI対戦用デッキが不正です。Deck1とDeck2を保存してください。");
+            "対戦用デッキが不正です。AI Deck Catalogまたは保存デッキを設定してください。");
     }
 
     private bool ConfigureAgentBehavior()

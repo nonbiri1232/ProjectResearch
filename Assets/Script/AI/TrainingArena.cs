@@ -8,7 +8,16 @@ public class TrainingArena : MonoBehaviour
     [SerializeField] private MlAgents agentA;
     [SerializeField] private MlAgents agentB;
 
-    [Header("保存済みデッキを使うか(falseならBasicDeck)")]
+    [Header("AI Deck Pool")]
+    [Tooltip("AIに使用させるデッキを登録したカタログ")]
+    [SerializeField] private AIDeckCatalog aiDeckCatalog;
+    [Tooltip("Agent Aの候補デッキID。空ならカタログ内の全デッキが候補")]
+    [SerializeField] private List<int> agentADeckIds = new List<int>();
+    [Tooltip("Agent Bの候補デッキID。空ならカタログ内の全デッキが候補")]
+    [SerializeField] private List<int> agentBDeckIds = new List<int>();
+
+    [Header("Fallback")]
+    [Tooltip("カタログから選べない場合に保存済みデッキを使う")]
     [SerializeField] private bool useSavedDecks = false;
 
     private GameManager gm;
@@ -32,10 +41,12 @@ public class TrainingArena : MonoBehaviour
             gm.OnGameFinished -= HandleGameFinished;
         }
 
-        List<Card> deckA = BuildDeck(
-            useSavedDecks ? DeckManager.player1Deck : null);
-        List<Card> deckB = BuildDeck(
-            useSavedDecks ? DeckManager.player2Deck : null);
+        List<Card> deckA = BuildAIDeck(
+            agentADeckIds, useSavedDecks ? DeckManager.player1Deck : null,
+            out int deckAId);
+        List<Card> deckB = BuildAIDeck(
+            agentBDeckIds, useSavedDecks ? DeckManager.player2Deck : null,
+            out int deckBId);
 
         Player playerA = new Player(deckA);
         Player playerB = new Player(deckB);
@@ -48,7 +59,9 @@ public class TrainingArena : MonoBehaviour
         // Agentが終了報酬を処理した後、次フレームで次の対局を始める。
         gm.OnGameFinished += HandleGameFinished;
 
-        Debug.Log($"【学習】対局開始！ deckA枚数:{deckA.Count} deckB枚数:{deckB.Count}");
+        Debug.Log(
+            $"【学習】対局開始！ Agent A Deck ID:{FormatDeckId(deckAId)} " +
+            $"Agent B Deck ID:{FormatDeckId(deckBId)}");
     }
 
     private void HandleGameFinished(Player winner)
@@ -72,15 +85,35 @@ public class TrainingArena : MonoBehaviour
         }
     }
 
-    private List<Card> BuildDeck(List<int> deckIds)
+    private List<Card> BuildAIDeck(
+        IReadOnlyList<int> allowedDeckIds,
+        List<int> fallbackDeckIds,
+        out int selectedDeckId)
     {
-        if (deckIds == null || deckIds.Count == 0)
+        if (aiDeckCatalog != null &&
+            aiDeckCatalog.TryCreateRandomDeck(allowedDeckIds, out List<Card> deck,
+                out selectedDeckId))
         {
-            return DeckManager.CreateBasicCardDeck();
+            return deck;
         }
 
-        List<Card> deck = Player.ChangeCard(deckIds.ToArray());
-        // GameManagerは開始時に4枚引くため、5枚未満では初回判定で即終了する。
-        return deck.Count >= 5 ? deck : DeckManager.CreateBasicCardDeck();
+        selectedDeckId = -1;
+        return BuildFallbackDeck(fallbackDeckIds);
+    }
+
+    private static List<Card> BuildFallbackDeck(List<int> deckIds)
+    {
+        if (deckIds != null && deckIds.Count > 0)
+        {
+            List<Card> deck = Player.ChangeCard(deckIds.ToArray());
+            if(deck.Count >= 5)return deck;
+        }
+
+        return DeckManager.CreateBasicCardDeck();
+    }
+
+    private static string FormatDeckId(int deckId)
+    {
+        return deckId >= 0 ? deckId.ToString() : "Fallback";
     }
 }

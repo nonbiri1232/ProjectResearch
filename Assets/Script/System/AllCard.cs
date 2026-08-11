@@ -402,7 +402,8 @@ public class CarnelPanicZero : Card
     }
     public override void FailSafe(Player Enemy, List<Card> target = null)
     {
-        
+        bool activatedAtFailSafeOne = player.maxMemory == 1;
+
         if(player.maxMemory > 0 && player.maxMemory <= 5)
         {
             if(Enemy.field.Count > 0){
@@ -434,7 +435,10 @@ public class CarnelPanicZero : Card
             List<Card> targetList = new List<Card>(Enemy.field);
             player.DestoryField(Enemy, targetList);
         }
-        this.Constructor(Enemy ,target);
+        if(!activatedAtFailSafeOne)
+        {
+            this.Constructor(Enemy,target);
+        }
     }
 }
 public class AllDelete : Card
@@ -574,13 +578,22 @@ public class ForcedCrashTest : Card
 
     public override void Constructor(Player Enemy, List<Card> target = null)
     {
+        const int forcedFailSafeMemory = 1;
         int originalMemory = player.maxMemory;
 
         try
         {
-            List<Card> candidates = player.deck.FindAll(c=>c.IsFailSafe());
+            player.maxMemory = forcedFailSafeMemory;
+            Card selected = null;
+            foreach(Card card in player.deck)
+            {
+                if(card.IsFailSafe())
+                {
+                    selected = card;
+                    break;
+                }
+            }
 
-            Card selected = RandomSelect(candidates);
             if(selected != null)
             {
                 player.DoFailSafe(Enemy, selected);
@@ -588,7 +601,8 @@ public class ForcedCrashTest : Card
         }
         finally
         {
-            player.maxMemory = originalMemory;
+            int failSafeMemoryDelta = player.maxMemory - forcedFailSafeMemory;
+            player.maxMemory = originalMemory + failSafeMemoryDelta;
         }
     }
 }

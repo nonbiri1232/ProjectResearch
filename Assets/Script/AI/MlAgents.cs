@@ -149,6 +149,21 @@ public class MlAgents : Agent
         int enemyFieldLimit = Mathf.Max(enemyPlayer.field.Count, 1);
         for (int i = enemyFieldLimit; i < 20; i++)
             actionMask.SetActionEnabled(3, i, false);
+
+        if (gm.currentPhase == PhaseState.Start && gm.systemTurn == 1)
+        {
+            for (int i = myPlayer.hand.Count; i < 4; i++)
+                actionMask.SetActionEnabled(4 + i, 1, false);
+        }
+        else
+        {
+            int selectableCount = gm.currentPhase == PhaseState.Start
+                ? myPlayer.field.Count
+                : Mathf.Max(myPlayer.hand.Count,
+                    Mathf.Max(myPlayer.field.Count, enemyPlayer.field.Count));
+            for (int i = selectableCount; i < 20; i++)
+                actionMask.SetActionEnabled(8 + i, 1, false);
+        }
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -263,7 +278,7 @@ public class MlAgents : Agent
     //   Branch 2     (20): 自分側インデックス       (Attack元 / Play対象がselfField・handの場合)
     //   Branch 3     (20): 相手の場インデックス     (Attack の対象 / Play の対象が enemyField の場合)
     //   Branch 4~7   (2 x4) : マリガン手札マスク。Main時はBranch 4を追加コスト選択に再利用
-    //   Branch 8~27  (2 x20): 場マスク    [i]=1なら自分の場のi番目をSelfGarbageの対象に含める
+    //   Branch 8~27  (2 x20): 対象マスク。Start時はSelfGarbage、Main時はPlay対象に使用
     public override void OnActionReceived(ActionBuffers actions)
     {
         if (episodeFinished || !ComputeIsMyTurn()) return;
@@ -320,58 +335,17 @@ public class MlAgents : Agent
 
             case ActionType.Play:
             {
-                // 手札からカードをプレイする(対象は単一のためBranch1をそのまま使用)
                 if (handIndex >= 0 && handIndex < myPlayer.hand.Count)
                 {
                     Card sourceCard = myPlayer.hand[handIndex];
                     if (!HasBasicPlayRequirements(sourceCard)) break;
-                    List<Card> target = null;
 
-                    // カードごとの Select 情報にあわせて対象を決定する
-                    if (sourceCard.select != null && sourceCard.select.isSelectConstructor)
-                    {
-                        List<Card> pool = null;
-                        int targetIndex = -1;
-
-                        switch (sourceCard.select.whereTarget)
-                        {
-                            case where.hand:
-                                pool = myPlayer.hand;
-                                // Branch 1はプレイ元なので、手札対象はBranch 2で選ぶ。
-                                targetIndex = myFieldIndex;
-                                break;
-                            case where.selfField:
-                                pool = myPlayer.field;
-                                targetIndex = myFieldIndex;
-                                break;
-                            case where.enemyField:
-                                pool = enemyPlayer.field;
-                                targetIndex = enemyFieldIndex;
-                                break;
-                        }
-
-                        if (pool == null || targetIndex < 0 || targetIndex >= pool.Count)
-                        {
-                            break;
-                        }
-
-                        target = new List<Card>() { pool[targetIndex] };
-                        if (!sourceCard.ValidateTargets(myPlayer, enemyPlayer, target))
-                        {
-                            break;
-                        }
-                    }
-
-                    if (sourceCard.select != null && sourceCard.select.isSelectConstructor && target == null)
-                    {
-                        break;
-                    }
-
-                    playerAction = target != null
-                        ? new PlayerAction(ActionType.Play, sourceCard, target)
+                    List<Card> targets = BuildPlayTargets(sourceCard, d);
+                    playerAction = targets.Count > 0
+                        ? new PlayerAction(ActionType.Play, sourceCard, targets)
                         : new PlayerAction(ActionType.Play, sourceCard);
 
-                    // Mainでは未使用のBranch 4を追加コスト選択として再利用する。
+                    // MainではBranch 4を追加コスト選択として再利用する。
                     playerAction.isAddCost = d[4] == 1 && CanPayAdditionalCost(sourceCard);
                 }
                 break;
@@ -433,8 +407,6 @@ public class MlAgents : Agent
             gm.decisionTick++;
         }
 
-        Debug.Log($"【Action】{gameObject.name} type:{actionType} isCorrect:{isCorrect}");
-
         if (!isCorrect)
         {
             // ルール上実行できない行動を選んだ場合のペナルティ
@@ -460,37 +432,52 @@ public class MlAgents : Agent
         if (card.isAssert && !ignoreAssert && myPlayer.maxMemory > card.Assert) return false;
         if (card is DeepArchive && myPlayer.garbage.Count < 10) return false;
 
-        return HasAnyValidTarget(card);
+        // 対象指定は0枚から上限枚数まで任意なので、候補の有無でプレイを禁止しない。
+        return true;
     }
 
-    private bool HasAnyValidTarget(Card card)
+    private List<Card> BuildPlayTargets(Card sourceCard, ActionSegment<int> actions)
     {
-        if (card.select == null || !card.select.isSelectConstructor) return true;
+        List<Card> targets = new List<Card>();
+        if (sourceCard.select == null || !sourceCard.select.isSelectConstructor)
+            return targets;
 
-        List<Card> pool = null;
-        switch (card.select.whereTarget)
+        List<Card> pool = GetPlayTargetPool(sourceCard.select.whereTarget);
+        int limit = Mathf.Min(sourceCard.select.numOfSelect, pool.Count);
+        for (int i = 0; i < pool.Count && i < 20 && targets.Count < limit; i++)
         {
-            case where.hand:
-                pool = myPlayer.hand;
-                break;
-            case where.selfField:
-                pool = myPlayer.field;
-                break;
-            case where.enemyField:
-                pool = enemyPlayer.field;
-                break;
-        }
+            if (actions[8 + i] != 1) continue;
 
-        if (pool == null) return false;
-        foreach (Card candidate in pool)
-        {
-            if (card.ValidateTargets(
+            Card candidate = pool[i];
+            if (sourceCard.ValidateTargets(
                 myPlayer, enemyPlayer, new List<Card>() { candidate }))
             {
-                return true;
+                targets.Add(candidate);
             }
         }
-        return false;
+
+        // 組み合わせとして無効なら、ルール上有効な「対象0枚」に戻す。
+        if (targets.Count > 0 &&
+            !sourceCard.ValidateTargets(myPlayer, enemyPlayer, targets))
+        {
+            targets.Clear();
+        }
+        return targets;
+    }
+
+    private List<Card> GetPlayTargetPool(where targetArea)
+    {
+        switch (targetArea)
+        {
+            case where.hand:
+                return myPlayer.hand;
+            case where.selfField:
+                return myPlayer.field;
+            case where.enemyField:
+                return enemyPlayer.field;
+            default:
+                return new List<Card>();
+        }
     }
 
     private bool CanPayAdditionalCost(Card card)

@@ -17,5 +17,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scene/LocalGame.unity
     guid: 10bce5e202205a34c852d4219f65a08b
+  - enabled: 1
+    path: Assets/Scene/AIBattle.unity
+    guid: 0bf0bc61f6857aa429fdaaac19d79bc2
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
