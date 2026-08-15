@@ -5,6 +5,7 @@ using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 
+//mlagents-learn card_game_config.yaml --run-id= --initialize-from=
 public class MlAgents : Agent
 {
     public Player myPlayer;
