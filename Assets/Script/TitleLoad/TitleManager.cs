@@ -37,6 +37,18 @@ public class TitleManager : MonoBehaviour
             }
         }
     }
+    public void GoToAIBattle()
+    {
+        if(DeckManager.player1Deck.Count == DeckManager.MAXDECKNUM)
+        {
+            sceneTransition.GoToLoadingScene("AIBattle");
+        }
+        else
+        {
+            alert.SetActive(true);
+            alertText.text = "Player1のデッキの枚数が足りません。";
+        }
+    }
     public void OpenSelectLocal()
     {
         if(DeckManager.player1Deck.Count == DeckManager.MAXDECKNUM)
