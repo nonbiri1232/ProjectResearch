@@ -350,5 +350,14 @@ public class Card
                 return null;
         }
     }
-    
+    public static Card CreateCardInstance(CardData card)
+    {
+        Card c = Card.CreateCardInstance(card.id);
+        c.Attack = card.atk;
+        c.Hp = card.hp;
+        c.Cost = card.cost;
+        c.isCanAttack = card.canAttackNow;
+
+        return c;
+    }
 }
