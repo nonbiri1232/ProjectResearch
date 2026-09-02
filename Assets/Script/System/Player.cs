@@ -18,6 +18,11 @@ public class Player
     public Random rand;
 
     public event Action<Card> OnFailSafeTriggered;
+    public event Action<Card> OnCardSpawned;
+    public void TriggerCardSpawned(Card spawnedCard)
+    {
+        OnCardSpawned?.Invoke(spawnedCard);
+    }
     public Player(List<Card> Deck)
     {
         deck.AddRange(Deck);

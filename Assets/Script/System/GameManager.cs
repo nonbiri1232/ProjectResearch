@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.AppUI.UI;
 public enum GameState
 {
     Processing,
@@ -55,6 +56,17 @@ public class PlayerAction
         targetCard.AddRange(target);
     }
     
+}
+
+public struct BoardData
+{
+    public List<CardData> selfField;
+    public List<CardData> selfHand;
+    
+    public List<CardData> selfGarbage;
+    public List<CardData> enemyField;
+    
+    public List<CardData> enemyGarbage;
 }
 
 public class GameManager
@@ -563,6 +575,16 @@ public class GameManager
         source.isEncrypted = false;
         source.isAttacked++;
         return true;
+    }
+    public BoardData GetBoardData(Player player)
+    {
+        BoardData board = new BoardData();
+        board.selfHand = Card.PackingCard(player.hand);
+        board.enemyField = Card.PackingCard((player==player1?player1:player2).field);
+        board.selfField = Card.PackingCard(player.field);
+
+
+        return board;
     }
     private bool CheckCorrectPlayer(Player move,Player wait)
     {

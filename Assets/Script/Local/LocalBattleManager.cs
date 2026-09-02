@@ -4,7 +4,9 @@ using UnityEngine;
 
 public struct CardData : INetworkSerializable
 {
+    public int uniqueId;
     public int id;
+    public int type; //1.Object 2.Method 3.Scope
     public int cost;
     public int atk;
     public int hp;

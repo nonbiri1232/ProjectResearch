@@ -481,6 +481,8 @@ public static class CardImplementationUtilities
         card.cr.OnPlay(card);
         card.Constructor(enemy);
         card.OnPlay();
+
+        owner.TriggerCardSpawned(card);
         return true;
     }
 
@@ -837,7 +839,7 @@ public class TrojanHorse : Card
             }
             cr.OnPlay(token);
             token.OnPlay();
-
+            Enemy.TriggerCardSpawned(token);
         }
     }
 }

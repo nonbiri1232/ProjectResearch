@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Xml;
 public enum where
 {
     None,
@@ -32,6 +33,8 @@ public class Card
 
     public Player player;
     public Crest cr;
+    protected static int NowUniqueId = 0;
+    public int uniqueId{get;private set;}
     public bool isCanAttack{get;set;} = true;
     public bool isFirstTurn{get;set;} = true;
     public bool Proxy{get;set;}
@@ -88,6 +91,10 @@ public class Card
 
     private readonly List<Action<Player, List<Card>>> additionalDestructorEffects = new List<Action<Player, List<Card>>>();
 
+    public Card()
+    {
+        uniqueId = NowUniqueId++;
+    }
     public void AddDestructorEffect(Action<Player, List<Card>> effect)
     {
         if (effect != null)
@@ -359,5 +366,30 @@ public class Card
         c.isCanAttack = card.canAttackNow;
 
         return c;
+    }
+    public static List<CardData> PackingCard(List<Card> cards)
+    {
+        List<CardData> cardDatas = new List<CardData>();
+        foreach(var c in cards)
+        {
+            CardData cardData = new CardData();
+            cardData.id = GetCardId(c);
+            cardData.atk = c.Attack;
+            cardData.hp = c.Hp;
+            cardData.cost = c.Cost;
+            cardData.canAttackNow = (c != null &&
+               c.Type == Card.CardType.Object &&
+               c.player == c.player.gm.turn &&
+               c.player.gm.currentPhase == PhaseState.Main &&
+               c.player.field.Contains(c) &&
+               c.isCanAttack &&
+               (!c.isFirstTurn || c.isImmediate) &&
+               c.isAttacked < c.attackTimes);
+            cardData.uniqueId = c.uniqueId;
+            cardData.type = (c.Type == CardType.Object?1:c.Type == CardType.Method?2:3);
+
+            cardDatas.Add(cardData);
+        }
+        return cardDatas;
     }
 }
