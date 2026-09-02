@@ -1,12 +1,24 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.MLAgents;
+
+public enum TrainingOpponentMode
+{
+    RuleBased,
+    SelfPlay
+}
 
 public class TrainingArena : MonoBehaviour
 {
     [Header("対局させる2体のAgent")]
     [SerializeField] private MlAgents agentA;
     [SerializeField] private MlAgents agentB;
+
+    [Header("Training Mode")]
+    [Tooltip("RuleBased: 固定教師との学習 / SelfPlay: ML-Agent同士の自己対戦")]
+    [SerializeField] private TrainingOpponentMode opponentMode =
+        TrainingOpponentMode.RuleBased;
 
     [Header("AI Deck Pool")]
     [Tooltip("AIに使用させるデッキを登録したカタログ")]
@@ -21,10 +33,17 @@ public class TrainingArena : MonoBehaviour
     [SerializeField] private bool useSavedDecks = false;
 
     private GameManager gm;
+    private Player playerA;
+    private Player playerB;
+    private RuleBasedController ruleBasedOpponent;
     private bool isStartingNextMatch;
+    private int completedMatches;
 
     private void Start()
     {
+        ConfigureOpponentController();
+        if (!enabled) return;
+
         if (useSavedDecks)
         {
             DeckManager.LoadDeck();
@@ -48,26 +67,46 @@ public class TrainingArena : MonoBehaviour
             agentBDeckIds, useSavedDecks ? DeckManager.player2Deck : null,
             out int deckBId);
 
-        Player playerA = new Player(deckA);
-        Player playerB = new Player(deckB);
+        playerA = new Player(deckA);
+        playerB = new Player(deckB);
 
         gm = new GameManager(playerA, playerB);
 
+        agentA.enabled = true;
         agentA.Initialize(playerA, playerB, gm);
-        agentB.Initialize(playerB, playerA, gm);
+        if (opponentMode == TrainingOpponentMode.SelfPlay)
+        {
+            agentB.enabled = true;
+            agentB.Initialize(playerB, playerA, gm);
+            if (ruleBasedOpponent != null) ruleBasedOpponent.enabled = false;
+        }
+        else
+        {
+            agentB.enabled = false;
+            ruleBasedOpponent.Initialize(playerB, playerA, gm);
+        }
 
         // Agentが終了報酬を処理した後、次フレームで次の対局を始める。
         gm.OnGameFinished += HandleGameFinished;
 
         Debug.Log(
-            $"【学習】対局開始！ Agent A Deck ID:{FormatDeckId(deckAId)} " +
-            $"Agent B Deck ID:{FormatDeckId(deckBId)}");
+            $"【学習】対局開始！ Mode:{opponentMode} " +
+            $"Agent A Deck ID:{FormatDeckId(deckAId)} " +
+            $"Opponent Deck ID:{FormatDeckId(deckBId)}");
     }
 
     private void HandleGameFinished(Player winner)
     {
         if (isStartingNextMatch) return;
         isStartingNextMatch = true;
+        completedMatches++;
+
+        StatsRecorder stats = Academy.Instance.StatsRecorder;
+        stats.Add("CardGame/Match/AgentAWin", winner == playerA ? 1f : 0f);
+        stats.Add("CardGame/Match/SystemTurns", gm.systemTurn);
+        stats.Add("CardGame/Match/OpponentMode", (float)opponentMode,
+            StatAggregationMethod.MostRecent);
+
         StartCoroutine(StartNextMatch());
     }
 
@@ -83,6 +122,25 @@ public class TrainingArena : MonoBehaviour
         {
             gm.OnGameFinished -= HandleGameFinished;
         }
+    }
+
+    private void ConfigureOpponentController()
+    {
+        if (agentA == null || agentB == null)
+        {
+            Debug.LogError("TrainingArena: Agent A/Bが設定されていません。");
+            enabled = false;
+            return;
+        }
+
+        ruleBasedOpponent = agentB.GetComponent<RuleBasedController>();
+        if (ruleBasedOpponent == null)
+        {
+            ruleBasedOpponent = agentB.gameObject.AddComponent<RuleBasedController>();
+        }
+        ruleBasedOpponent.enabled =
+            opponentMode == TrainingOpponentMode.RuleBased;
+        agentB.enabled = opponentMode == TrainingOpponentMode.SelfPlay;
     }
 
     private List<Card> BuildAIDeck(

@@ -1,20 +1,53 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 
-//mlagents-learn card_game_config.yaml --run-id= --initialize-from=
+// Action Spec: Discrete Branches = [21]
+// 報酬定義実験: mlagents-learn ml-agents-configs/reward_based_selfplay_config.yaml --run-id=
+// 比較用ベースライン: mlagents-learn ml-agents-configs/terminal_only_selfplay_config.yaml --run-id=
 public class MlAgents : Agent
 {
+    private enum DecisionStage
+    {
+        SelectAction,
+        SelectMarigan,
+        SelectSelfGarbage,
+        SelectPlaySource,
+        SelectPlayTarget,
+        SelectAdditionalCost,
+        SelectAttackSource,
+        SelectAttackTarget
+    }
+
     public Player myPlayer;
     public Player enemyPlayer;
     public GameManager gm;
 
-    private const int ObservationSize = 880;
+    [Header("Win Progress Reward")]
+    [FormerlySerializedAs("boardRewardScale")]
+    [SerializeField, Range(0f, 0.2f)]
+    private float memoryProgressRewardScale = 0.05f;
+
+    private const int ActionBranchSize = 21;
+    private const int ObservationSize = 947;
+    private const int MaxHandSize = 8;
+    private const int MaxFieldSize = 20;
+
+    private readonly List<Card> pendingTargets = new List<Card>();
+    private DecisionStage decisionStage = DecisionStage.SelectAction;
+    private ActionType pendingAction;
+    private Card pendingSource;
+    private bool hasPendingAction;
     private int lastTick = -1;
     private bool episodeFinished;
+    private float lastMemoryAdvantage;
+    private bool hasMemoryAdvantage;
+    private int episodeExecutedActions;
+    private int episodeInvalidSelections;
 
     public void Initialize(Player me, Player enemy, GameManager manager)
     {
@@ -27,12 +60,26 @@ public class MlAgents : Agent
         enemyPlayer = enemy;
         gm = manager;
         episodeFinished = false;
+        episodeExecutedActions = 0;
+        episodeInvalidSelections = 0;
+        memoryProgressRewardScale = Academy.Instance.EnvironmentParameters
+            .GetWithDefault(
+                "memory_progress_reward_scale",
+                memoryProgressRewardScale);
         lastTick = manager != null ? manager.decisionTick - 1 : -1;
+        ResetPendingDecision();
+        lastMemoryAdvantage = BoardEvaluator.Evaluate(me, enemy, manager);
+        hasMemoryAdvantage = true;
 
         if (gm != null)
         {
             gm.OnGameFinished += HandleGameFinished;
         }
+
+        Academy.Instance.StatsRecorder.Add(
+            GetStatsPrefix() + "/MemoryRewardScale",
+            memoryProgressRewardScale,
+            StatAggregationMethod.MostRecent);
     }
 
     private void OnDestroy()
@@ -52,7 +99,7 @@ public class MlAgents : Agent
             lastTick = gm.decisionTick;
             if (ComputeIsMyTurn())
             {
-                RequestDecision();
+                BeginTurnDecision();
             }
         }
     }
@@ -64,15 +111,50 @@ public class MlAgents : Agent
 
         if (gm.currentPhase == PhaseState.Start && gm.systemTurn == 1)
         {
-            // 初手マリガンは同時進行
             return gm.NeedsMarigan(myPlayer);
         }
 
-        // それ以外(自壊フェーズ・メインフェーズ)は通常のターン制
         return gm.turn == myPlayer;
     }
 
+    private void BeginTurnDecision()
+    {
+        ApplyMemoryProgressReward();
+        ResetPendingDecision();
 
+        if (gm.currentPhase == PhaseState.Start)
+        {
+            pendingAction = gm.systemTurn == 1
+                ? ActionType.Marigan
+                : ActionType.SelfGarbage;
+            hasPendingAction = true;
+            decisionStage = gm.systemTurn == 1
+                ? DecisionStage.SelectMarigan
+                : DecisionStage.SelectSelfGarbage;
+        }
+        else
+        {
+            decisionStage = DecisionStage.SelectAction;
+        }
+
+        RecordDecisionStats();
+        RequestDecision();
+    }
+
+    private void ResetPendingDecision()
+    {
+        decisionStage = DecisionStage.SelectAction;
+        hasPendingAction = false;
+        pendingSource = null;
+        pendingTargets.Clear();
+    }
+
+    private void RequestNextStage(DecisionStage nextStage)
+    {
+        decisionStage = nextStage;
+        RecordDecisionStats();
+        RequestDecision();
+    }
 
     private void HandleGameFinished(Player winner)
     {
@@ -85,98 +167,188 @@ public class MlAgents : Agent
         else if (winner == enemyPlayer)
             AddReward(-1.0f);
 
+        StatsRecorder stats = Academy.Instance.StatsRecorder;
+        string prefix = GetStatsPrefix();
+        stats.Add(prefix + "/Win", winner == myPlayer ? 1f : 0f);
+        stats.Add(prefix + "/ExecutedActions", episodeExecutedActions);
+        stats.Add(prefix + "/InvalidSelections", episodeInvalidSelections);
+        stats.Add(prefix + "/FinalMemoryAdvantage",
+            BoardEvaluator.Evaluate(myPlayer, enemyPlayer, gm));
+
         EndEpisode();
     }
 
+    private void ApplyMemoryProgressReward()
+    {
+        if (!hasMemoryAdvantage || episodeFinished || gm == null ||
+            gm.currentState == GameState.Finished)
+        {
+            return;
+        }
+
+        float currentMemoryAdvantage = BoardEvaluator.Evaluate(
+            myPlayer, enemyPlayer, gm);
+        float reward = Mathf.Clamp(
+            (currentMemoryAdvantage - lastMemoryAdvantage) *
+            memoryProgressRewardScale,
+            -0.05f,
+            0.05f);
+        lastMemoryAdvantage = currentMemoryAdvantage;
+
+        if (Mathf.Abs(reward) > 0.000001f)
+        {
+            AddReward(reward);
+            Academy.Instance.StatsRecorder.Add(
+                GetStatsPrefix() + "/MemoryProgressReward", reward);
+        }
+    }
+
+    private void RecordDecisionStats()
+    {
+        bool[] enabled = BuildEnabledActions();
+        int legalChoiceCount = 0;
+        foreach (bool isEnabled in enabled)
+        {
+            if (isEnabled) legalChoiceCount++;
+        }
+
+        StatsRecorder stats = Academy.Instance.StatsRecorder;
+        string prefix = GetStatsPrefix();
+        stats.Add(prefix + "/LegalChoiceCount", legalChoiceCount);
+        stats.Add(prefix + "/DecisionStage", (float)decisionStage,
+            StatAggregationMethod.Histogram);
+    }
+
+    private string GetStatsPrefix()
+    {
+        return "CardGame/" + gameObject.name;
+    }
 
     public override void WriteDiscreteActionMask(IDiscreteActionMask actionMask)
     {
-        if (episodeFinished || gm == null || myPlayer == null || enemyPlayer == null)
-            return;
+        if (episodeFinished || !ComputeIsMyTurn()) return;
 
-        if (gm.currentPhase == PhaseState.Start)
+        bool[] enabled = BuildEnabledActions();
+        bool hasEnabledAction = false;
+        for (int i = 0; i < enabled.Length; i++)
         {
-            if (gm.systemTurn == 1)
+            if (enabled[i])
             {
-                // マリガン専用フェーズ:Mariganだけ許可
-                actionMask.SetActionEnabled(0, (int)ActionType.SelfGarbage, false);
-                actionMask.SetActionEnabled(0, (int)ActionType.Play, false);
-                actionMask.SetActionEnabled(0, (int)ActionType.Attack, false);
-                actionMask.SetActionEnabled(0, (int)ActionType.End, false);
+                hasEnabledAction = true;
             }
             else
             {
-                // 自壊専用フェーズ:SelfGarbageだけ許可
-                actionMask.SetActionEnabled(0, (int)ActionType.Marigan, false);
-                actionMask.SetActionEnabled(0, (int)ActionType.Play, false);
-                actionMask.SetActionEnabled(0, (int)ActionType.Attack, false);
-                actionMask.SetActionEnabled(0, (int)ActionType.End, false);
-            }
-        }
-        else // Main
-        {
-            actionMask.SetActionEnabled(0, (int)ActionType.Marigan, false);
-            actionMask.SetActionEnabled(0, (int)ActionType.SelfGarbage, false);
-
-            // 実行可能なカードや攻撃元がない行動は選ばせない。
-            if (!myPlayer.hand.Exists(HasBasicPlayRequirements))
-                actionMask.SetActionEnabled(0, (int)ActionType.Play, false);
-
-            if (!HasAnyLegalAttack())
-                actionMask.SetActionEnabled(0, (int)ActionType.Attack, false);
-        }
-
-        bool hasPlayableCard = myPlayer.hand.Exists(HasBasicPlayRequirements);
-        for (int i = 0; i < 8; i++)
-        {
-            bool inHand = i < myPlayer.hand.Count;
-            bool validPlayIndex = inHand && HasBasicPlayRequirements(myPlayer.hand[i]);
-
-            // MainでPlay候補がある場合だけ、プレイ不能な手札インデックスを除外する。
-            // 候補がない場合はBranch全無効を避けるため0番をダミーとして残す。
-            if (!inHand || (gm.currentPhase == PhaseState.Main &&
-                hasPlayableCard && !validPlayIndex))
-            {
-                if (i != 0 || myPlayer.hand.Count > 0)
-                    actionMask.SetActionEnabled(1, i, false);
+                actionMask.SetActionEnabled(0, i, false);
             }
         }
 
-        // Branch 2は自分の場と、where.handの対象選択で共用する。
-        int selfTargetLimit = Mathf.Max(Mathf.Max(myPlayer.field.Count, myPlayer.hand.Count), 1);
-        for (int i = selfTargetLimit; i < 20; i++)
-            actionMask.SetActionEnabled(2, i, false);
-
-        int enemyFieldLimit = Mathf.Max(enemyPlayer.field.Count, 1);
-        for (int i = enemyFieldLimit; i < 20; i++)
-            actionMask.SetActionEnabled(3, i, false);
-
-        if (gm.currentPhase == PhaseState.Start && gm.systemTurn == 1)
+        if (!hasEnabledAction)
         {
-            for (int i = myPlayer.hand.Count; i < 4; i++)
-                actionMask.SetActionEnabled(4 + i, 1, false);
+            Debug.LogError($"MlAgents: {decisionStage}で有効な行動がありません。");
         }
-        else
+    }
+
+    private bool[] BuildEnabledActions()
+    {
+        bool[] enabled = new bool[ActionBranchSize];
+
+        switch (decisionStage)
         {
-            int selectableCount = gm.currentPhase == PhaseState.Start
-                ? myPlayer.field.Count
-                : Mathf.Max(myPlayer.hand.Count,
-                    Mathf.Max(myPlayer.field.Count, enemyPlayer.field.Count));
-            for (int i = selectableCount; i < 20; i++)
-                actionMask.SetActionEnabled(8 + i, 1, false);
+            case DecisionStage.SelectAction:
+                enabled[0] = LegalActionGenerator.HasAnyLegalPlay(
+                    gm, myPlayer, enemyPlayer);
+                enabled[1] = LegalActionGenerator.HasAnyLegalAttack(
+                    gm, myPlayer, enemyPlayer);
+                enabled[2] = true;
+                break;
+
+            case DecisionStage.SelectMarigan:
+                enabled[0] = true;
+                for (int i = 0; i < myPlayer.hand.Count && i < 4; i++)
+                {
+                    enabled[i + 1] = !pendingTargets.Contains(myPlayer.hand[i]);
+                }
+                break;
+
+            case DecisionStage.SelectSelfGarbage:
+                enabled[0] = true;
+                for (int i = 0; i < myPlayer.field.Count && i < MaxFieldSize; i++)
+                {
+                    enabled[i + 1] = !pendingTargets.Contains(myPlayer.field[i]);
+                }
+                break;
+
+            case DecisionStage.SelectPlaySource:
+                for (int i = 0; i < myPlayer.hand.Count && i < MaxHandSize; i++)
+                {
+                    enabled[i + 1] = LegalActionGenerator.CanPlay(
+                        gm, myPlayer, enemyPlayer, myPlayer.hand[i]);
+                }
+                break;
+
+            case DecisionStage.SelectPlayTarget:
+                enabled[0] = true;
+                EnableValidPlayTargets(enabled);
+                break;
+
+            case DecisionStage.SelectAdditionalCost:
+                enabled[0] = true;
+                enabled[1] = LegalActionGenerator.CanPayAdditionalCost(
+                    myPlayer, pendingSource);
+                break;
+
+            case DecisionStage.SelectAttackSource:
+                for (int i = 0; i < myPlayer.field.Count && i < MaxFieldSize; i++)
+                {
+                    enabled[i + 1] = LegalActionGenerator.CanAttack(
+                        gm, myPlayer, enemyPlayer, myPlayer.field[i]);
+                }
+                break;
+
+            case DecisionStage.SelectAttackTarget:
+                EnableValidAttackTargets(enabled);
+                bool hasTarget = false;
+                for (int i = 1; i < enabled.Length; i++) hasTarget |= enabled[i];
+                enabled[0] = !hasTarget;
+                break;
+        }
+
+        return enabled;
+    }
+
+    private void EnableValidPlayTargets(bool[] enabled)
+    {
+        if (pendingSource == null) return;
+
+        List<Card> pool = LegalActionGenerator.GetPlayTargetPool(
+            myPlayer, enemyPlayer, pendingSource);
+        List<Card> validTargets = LegalActionGenerator.GetValidPlayTargets(
+            myPlayer, enemyPlayer, pendingSource);
+
+        for (int i = 0; i < pool.Count && i < MaxFieldSize; i++)
+        {
+            enabled[i + 1] = validTargets.Contains(pool[i]);
+        }
+    }
+
+    private void EnableValidAttackTargets(bool[] enabled)
+    {
+        List<Card> validTargets = LegalActionGenerator.GetValidAttackTargets(enemyPlayer);
+        for (int i = 0; i < enemyPlayer.field.Count && i < MaxFieldSize; i++)
+        {
+            enabled[i + 1] = validTargets.Contains(enemyPlayer.field[i]);
         }
     }
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        if (myPlayer == null || enemyPlayer == null)
+        if (myPlayer == null || enemyPlayer == null || gm == null)
         {
             for (int i = 0; i < ObservationSize; i++)
                 sensor.AddObservation(0f);
             return;
         }
 
-        //Agentの情報
         sensor.AddObservation(myPlayer.maxMemory);
         sensor.AddObservation(myPlayer.fieldCost);
         sensor.AddObservation(myPlayer.usedMemory);
@@ -185,7 +357,7 @@ public class MlAgents : Agent
         sensor.AddObservation(myPlayer.field.Count);
         sensor.AddObservation(myPlayer.deck.Count);
         sensor.AddObservation(myPlayer.garbage.Count);
-        //Enemyの情報
+
         sensor.AddObservation(enemyPlayer.maxMemory);
         sensor.AddObservation(enemyPlayer.fieldCost);
         sensor.AddObservation(enemyPlayer.usedMemory);
@@ -195,19 +367,57 @@ public class MlAgents : Agent
         sensor.AddObservation(enemyPlayer.deck.Count);
         sensor.AddObservation(enemyPlayer.garbage.Count);
 
-        //手札の情報
-        ObserveCard(sensor, myPlayer.hand, 8);
-        //Agentのフィールドの情報
-        ObserveCard(sensor, myPlayer.field, 20);
-        //Enemyのフィールドの情報
-        ObserveCard(sensor, enemyPlayer.field, 20);
+        ObserveCard(sensor, myPlayer.hand, MaxHandSize);
+        ObserveCard(sensor, myPlayer.field, MaxFieldSize);
+        ObserveCard(sensor, enemyPlayer.field, MaxFieldSize);
+
+        AddOneHot(sensor, (int)gm.currentPhase, 3);
+        AddOneHot(sensor, (int)decisionStage, 8);
+        AddOneHot(sensor, hasPendingAction ? (int)pendingAction : -1, 5);
+
+        int handSourceIndex = pendingSource != null
+            ? myPlayer.hand.IndexOf(pendingSource)
+            : -1;
+        int fieldSourceIndex = pendingSource != null
+            ? myPlayer.field.IndexOf(pendingSource)
+            : -1;
+        sensor.AddObservation(handSourceIndex >= 0 ? handSourceIndex / 7f : -1f);
+        sensor.AddObservation(fieldSourceIndex >= 0 ? fieldSourceIndex / 19f : -1f);
+
+        ObserveSelectedCards(sensor, myPlayer.hand, MaxHandSize);
+        ObserveSelectedCards(sensor, myPlayer.field, MaxFieldSize);
+        ObserveSelectedCards(sensor, enemyPlayer.field, MaxFieldSize);
+        sensor.AddObservation(pendingTargets.Count / 20f);
     }
 
-    private void ObserveCard(VectorSensor sensor, List<Card> cardList,int maxCapacity)
+    private static void AddOneHot(VectorSensor sensor, int value, int size)
     {
-        for(int i = 0; i < maxCapacity; i++)
+        for (int i = 0; i < size; i++)
         {
-            if(i < cardList.Count)
+            sensor.AddObservation(value == i ? 1f : 0f);
+        }
+    }
+
+    private void ObserveSelectedCards(
+        VectorSensor sensor,
+        List<Card> cards,
+        int maxCapacity)
+    {
+        for (int i = 0; i < maxCapacity; i++)
+        {
+            sensor.AddObservation(
+                i < cards.Count && pendingTargets.Contains(cards[i]) ? 1f : 0f);
+        }
+    }
+
+    private static void ObserveCard(
+        VectorSensor sensor,
+        List<Card> cardList,
+        int maxCapacity)
+    {
+        for (int i = 0; i < maxCapacity; i++)
+        {
+            if (i < cardList.Count)
             {
                 Card card = cardList[i];
                 sensor.AddObservation(Card.GetCardId(card));
@@ -215,7 +425,6 @@ public class MlAgents : Agent
                 sensor.AddObservation(card.Attack);
                 sensor.AddObservation(card.Cost);
                 sensor.AddObservation(card.Hp);
-
                 sensor.AddObservation(card.isDaemon);
                 sensor.AddObservation(card.isEncrypted);
                 sensor.AddObservation(card.isImmediate);
@@ -234,174 +443,223 @@ public class MlAgents : Agent
             {
                 sensor.AddObservation(-1);
                 sensor.AddObservation(-1);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
-                sensor.AddObservation(0);
+                for (int value = 2; value < 18; value++)
+                    sensor.AddObservation(0);
             }
         }
     }
 
-    private int CardTypeInt(Card.CardType type)
+    private static int CardTypeInt(Card.CardType type)
     {
-        switch(type)
+        switch (type)
         {
-            case Card.CardType.Object:
-                return 0;
-            case Card.CardType.Method:
-                return 1;
-            case Card.CardType.Scope:
-                return 2;
-            default:
-                return -1;
+            case Card.CardType.Object: return 0;
+            case Card.CardType.Method: return 1;
+            case Card.CardType.Scope: return 2;
+            default: return -1;
         }
     }
 
-    // Discrete Branch構成 (合計28branch。BehaviorParametersのInspectorで以下のサイズを設定する必要があります)
-    //   [5, 8, 20, 20,
-    //    2,2,2,2,                                          // 手札マスク x4 (Mariganは初手4枚固定のため)
-    //    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]          // 場マスク x20
-    //
-    //   Branch 0     (5) : ActionType  0=Marigan, 1=SelfGarbage, 2=Play, 3=Attack, 4=End
-    //   Branch 1     (8) : 手札インデックス        (Play の対象選択に使用)
-    //   Branch 2     (20): 自分側インデックス       (Attack元 / Play対象がselfField・handの場合)
-    //   Branch 3     (20): 相手の場インデックス     (Attack の対象 / Play の対象が enemyField の場合)
-    //   Branch 4~7   (2 x4) : マリガン手札マスク。Main時はBranch 4を追加コスト選択に再利用
-    //   Branch 8~27  (2 x20): 対象マスク。Start時はSelfGarbage、Main時はPlay対象に使用
     public override void OnActionReceived(ActionBuffers actions)
     {
         if (episodeFinished || !ComputeIsMyTurn()) return;
 
-        var d = actions.DiscreteActions;
-        if (d.Length < 28)
+        var discreteActions = actions.DiscreteActions;
+        if (discreteActions.Length != 1)
         {
-            Debug.LogError("MlAgentsには28個のDiscrete Branchが必要です。");
+            Debug.LogError("MlAgentsのDiscrete Branchはサイズ21の1個に設定してください。");
             AddReward(-0.05f);
             return;
         }
 
-        int actionTypeIndex = d[0];
-        int handIndex       = d[1];
-        int myFieldIndex    = d[2];
-        int enemyFieldIndex = d[3];
+        int choice = discreteActions[0];
+        bool[] enabled = BuildEnabledActions();
+        if (choice < 0 || choice >= enabled.Length || !enabled[choice])
+        {
+            HandleInvalidSelection(choice);
+            return;
+        }
 
-        ActionType actionType = (ActionType)actionTypeIndex;
-        PlayerAction playerAction = null;
+        switch (decisionStage)
+        {
+            case DecisionStage.SelectAction:
+                ReceiveActionType(choice);
+                break;
+            case DecisionStage.SelectMarigan:
+                ReceiveMarigan(choice);
+                break;
+            case DecisionStage.SelectSelfGarbage:
+                ReceiveSelfGarbage(choice);
+                break;
+            case DecisionStage.SelectPlaySource:
+                ReceivePlaySource(choice);
+                break;
+            case DecisionStage.SelectPlayTarget:
+                ReceivePlayTarget(choice);
+                break;
+            case DecisionStage.SelectAdditionalCost:
+                ExecutePendingAction(choice == 1);
+                break;
+            case DecisionStage.SelectAttackSource:
+                ReceiveAttackSource(choice);
+                break;
+            case DecisionStage.SelectAttackTarget:
+                ReceiveAttackTarget(choice);
+                break;
+        }
+    }
 
-        switch (actionType)
+    private void ReceiveActionType(int choice)
+    {
+        pendingTargets.Clear();
+        pendingSource = null;
+        hasPendingAction = true;
+
+        switch (choice)
+        {
+            case 0:
+                pendingAction = ActionType.Play;
+                RequestNextStage(DecisionStage.SelectPlaySource);
+                break;
+            case 1:
+                pendingAction = ActionType.Attack;
+                RequestNextStage(DecisionStage.SelectAttackSource);
+                break;
+            case 2:
+                pendingAction = ActionType.End;
+                ExecutePendingAction(false);
+                break;
+        }
+    }
+
+    private void ReceiveMarigan(int choice)
+    {
+        if (choice == 0)
+        {
+            ExecutePendingAction(false);
+            return;
+        }
+
+        Card selected = myPlayer.hand[choice - 1];
+        pendingTargets.Add(selected);
+        if (pendingTargets.Count >= Mathf.Min(myPlayer.hand.Count, 4))
+            ExecutePendingAction(false);
+        else
+            RequestDecision();
+    }
+
+    private void ReceiveSelfGarbage(int choice)
+    {
+        if (choice == 0)
+        {
+            ExecutePendingAction(false);
+            return;
+        }
+
+        pendingTargets.Add(myPlayer.field[choice - 1]);
+        if (pendingTargets.Count >= Mathf.Min(myPlayer.field.Count, MaxFieldSize))
+            ExecutePendingAction(false);
+        else
+            RequestDecision();
+    }
+
+    private void ReceivePlaySource(int choice)
+    {
+        if (choice == 0)
+        {
+            BeginTurnDecision();
+            return;
+        }
+
+        pendingSource = myPlayer.hand[choice - 1];
+        pendingTargets.Clear();
+
+        if (pendingSource.select != null && pendingSource.select.isSelectConstructor)
+            RequestNextStage(DecisionStage.SelectPlayTarget);
+        else
+            RequestNextStage(DecisionStage.SelectAdditionalCost);
+    }
+
+    private void ReceivePlayTarget(int choice)
+    {
+        pendingTargets.Clear();
+        if (choice > 0)
+        {
+            List<Card> pool = LegalActionGenerator.GetPlayTargetPool(
+                myPlayer, enemyPlayer, pendingSource);
+            pendingTargets.Add(pool[choice - 1]);
+        }
+
+        RequestNextStage(DecisionStage.SelectAdditionalCost);
+    }
+
+    private void ReceiveAttackSource(int choice)
+    {
+        if (choice == 0)
+        {
+            BeginTurnDecision();
+            return;
+        }
+
+        pendingSource = myPlayer.field[choice - 1];
+        pendingTargets.Clear();
+
+        if (LegalActionGenerator.CanDirectAttack(pendingSource, enemyPlayer))
+            ExecutePendingAction(false);
+        else
+            RequestNextStage(DecisionStage.SelectAttackTarget);
+    }
+
+    private void ReceiveAttackTarget(int choice)
+    {
+        if (choice == 0)
+        {
+            pendingSource = null;
+            RequestNextStage(DecisionStage.SelectAttackSource);
+            return;
+        }
+
+        pendingTargets.Clear();
+        pendingTargets.Add(enemyPlayer.field[choice - 1]);
+        ExecutePendingAction(false);
+    }
+
+    private void ExecutePendingAction(bool addCost)
+    {
+        PlayerAction playerAction;
+        switch (pendingAction)
         {
             case ActionType.Marigan:
-            {
-                // 手札マスク(Branch4~7)を見て、引き直したいカードを複数選択する
-                // Mariganは初手ドロー直後(手札4枚固定)にしか発生しないため4枠で足りる
-                List<Card> target = new List<Card>();
-                for (int i = 0; i < myPlayer.hand.Count && i < 4; i++)
-                {
-                    if (d[4 + i] == 1)
-                    {
-                        target.Add(myPlayer.hand[i]);
-                    }
-                }
-                // targetが0枚でも「マリガンしない」という有効な選択として扱う
-                playerAction = new PlayerAction(ActionType.Marigan, target);
-                break;
-            }
-
             case ActionType.SelfGarbage:
-            {
-                // 場マスク(Branch8~27)を見て、破棄したい自分の場のカードを複数選択する
-                List<Card> target = new List<Card>();
-                for (int i = 0; i < myPlayer.field.Count && i < 20; i++)
-                {
-                    if (d[8 + i] == 1)
-                    {
-                        target.Add(myPlayer.field[i]);
-                    }
-                }
-                playerAction = new PlayerAction(ActionType.SelfGarbage, target);
+                playerAction = new PlayerAction(
+                    pendingAction, new List<Card>(pendingTargets));
                 break;
-            }
-
             case ActionType.Play:
-            {
-                if (handIndex >= 0 && handIndex < myPlayer.hand.Count)
-                {
-                    Card sourceCard = myPlayer.hand[handIndex];
-                    if (!HasBasicPlayRequirements(sourceCard)) break;
-
-                    List<Card> targets = BuildPlayTargets(sourceCard, d);
-                    playerAction = targets.Count > 0
-                        ? new PlayerAction(ActionType.Play, sourceCard, targets)
-                        : new PlayerAction(ActionType.Play, sourceCard);
-
-                    // MainではBranch 4を追加コスト選択として再利用する。
-                    playerAction.isAddCost = d[4] == 1 && CanPayAdditionalCost(sourceCard);
-                }
-                break;
-            }
-
             case ActionType.Attack:
-            {
-                // 自分の場のカードで攻撃する(対象は単一のためBranch2/3をそのまま使用)
-                if (myFieldIndex >= 0 && myFieldIndex < myPlayer.field.Count)
-                {
-                    Card sourceCard = myPlayer.field[myFieldIndex];
-                    if (!IsPotentialAttacker(sourceCard)) break;
-
-                    List<Card> validTargets = GetValidAttackTargets();
-                    bool enemyHasObjects = enemyPlayer.field.Exists(
-                        card => card.Type == Card.CardType.Object);
-                    if (!enemyHasObjects)
-                    {
-                        // GameManagerの仕様上、初ターン中はImmediateでも直接攻撃できない。
-                        if (!sourceCard.isFirstTurn)
-                            playerAction = new PlayerAction(ActionType.Attack, sourceCard);
-                    }
-                    else if (validTargets.Count > 0 &&
-                             enemyFieldIndex >= 0 && enemyFieldIndex < enemyPlayer.field.Count)
-                    {
-                        Card selectedTarget = enemyPlayer.field[enemyFieldIndex];
-                        if (validTargets.Contains(selectedTarget))
-                        {
-                            playerAction = new PlayerAction(
-                                ActionType.Attack, sourceCard, new List<Card>() { selectedTarget });
-                        }
-                    }
-                }
+                playerAction = pendingTargets.Count > 0
+                    ? new PlayerAction(
+                        pendingAction, pendingSource, new List<Card>(pendingTargets))
+                    : new PlayerAction(pendingAction, pendingSource);
+                playerAction.isAddCost = addCost;
                 break;
-            }
-
             case ActionType.End:
-            {
                 playerAction = new PlayerAction(ActionType.End);
                 break;
-            }
+            default:
+                HandleInvalidSelection(-1);
+                return;
         }
 
-        // インデックスが不正で行動を組み立てられなかった場合
-        if (playerAction == null)
-        {
-            AddReward(-0.05f);
-            gm.decisionTick++;
-            return;
-        }
+        episodeExecutedActions++;
+        Academy.Instance.StatsRecorder.Add(
+            GetStatsPrefix() + "/ActionType",
+            (float)playerAction.type,
+            StatAggregationMethod.Histogram);
 
         int tickBeforeAction = gm.decisionTick;
         bool isCorrect = gm.ExecuteAction(myPlayer, enemyPlayer, playerAction);
+        ResetPendingDecision();
 
-        // GameManagerの早期return経路でも、次の判断要求が止まらないようにする。
         if (!isCorrect && gm.currentState == GameState.WaitingForInput &&
             gm.decisionTick == tickBeforeAction)
         {
@@ -410,150 +668,67 @@ public class MlAgents : Agent
 
         if (!isCorrect)
         {
-            // ルール上実行できない行動を選んだ場合のペナルティ
+            episodeExecutedActions--;
             AddReward(-0.05f);
         }
         else if (gm.currentState != GameState.Finished)
         {
-            // 有効行動の反復で報酬を稼ぐことを防ぎ、短い手数での勝利を促す。
+            ApplyMemoryProgressReward();
             AddReward(-0.001f);
         }
-
-        // 勝敗による最終報酬(+1 / -1)は GameManager.OnGameFinished イベント側で
-        // AddReward() と EndEpisode() を呼ぶ設計を想定しています。
     }
 
-    private bool HasBasicPlayRequirements(Card card)
+    private void HandleInvalidSelection(int choice)
     {
-        if (card == null || !myPlayer.hand.Contains(card)) return false;
-
-        bool ignoreAssert = myPlayer.field.Exists(c => c is ForcedDebugMode);
-        if (myPlayer.fieldCost + card.Cost > myPlayer.maxMemory) return false;
-        if (myPlayer.usedMemory + card.Cost > myPlayer.usableMemory) return false;
-        if (card.isAssert && !ignoreAssert && myPlayer.maxMemory > card.Assert) return false;
-        if (card is DeepArchive && myPlayer.garbage.Count < 10) return false;
-
-        // 対象指定は0枚から上限枚数まで任意なので、候補の有無でプレイを禁止しない。
-        return true;
-    }
-
-    private List<Card> BuildPlayTargets(Card sourceCard, ActionSegment<int> actions)
-    {
-        List<Card> targets = new List<Card>();
-        if (sourceCard.select == null || !sourceCard.select.isSelectConstructor)
-            return targets;
-
-        List<Card> pool = GetPlayTargetPool(sourceCard.select.whereTarget);
-        int limit = Mathf.Min(sourceCard.select.numOfSelect, pool.Count);
-        for (int i = 0; i < pool.Count && i < 20 && targets.Count < limit; i++)
-        {
-            if (actions[8 + i] != 1) continue;
-
-            Card candidate = pool[i];
-            if (sourceCard.ValidateTargets(
-                myPlayer, enemyPlayer, new List<Card>() { candidate }))
-            {
-                targets.Add(candidate);
-            }
-        }
-
-        // 組み合わせとして無効なら、ルール上有効な「対象0枚」に戻す。
-        if (targets.Count > 0 &&
-            !sourceCard.ValidateTargets(myPlayer, enemyPlayer, targets))
-        {
-            targets.Clear();
-        }
-        return targets;
-    }
-
-    private List<Card> GetPlayTargetPool(where targetArea)
-    {
-        switch (targetArea)
-        {
-            case where.hand:
-                return myPlayer.hand;
-            case where.selfField:
-                return myPlayer.field;
-            case where.enemyField:
-                return enemyPlayer.field;
-            default:
-                return new List<Card>();
-        }
-    }
-
-    private bool CanPayAdditionalCost(Card card)
-    {
-        return card != null &&
-               card.Type == Card.CardType.Object &&
-               myPlayer.fieldCost + card.Cost + 1 <= myPlayer.maxMemory &&
-               myPlayer.usedMemory + card.Cost + 1 <= myPlayer.usableMemory;
-    }
-
-    private static bool IsPotentialAttacker(Card card)
-    {
-        return card != null &&
-               card.Type == Card.CardType.Object &&
-               card.isCanAttack &&
-               (!card.isFirstTurn || card.isImmediate) &&
-               card.isAttacked < card.attackTimes;
-    }
-
-    private bool HasAnyLegalAttack()
-    {
-        bool enemyHasObjects = enemyPlayer.field.Exists(
-            card => card.Type == Card.CardType.Object);
-        List<Card> validTargets = GetValidAttackTargets();
-
-        foreach (Card attacker in myPlayer.field)
-        {
-            if (!IsPotentialAttacker(attacker)) continue;
-            if (enemyHasObjects && validTargets.Count > 0) return true;
-            if (!enemyHasObjects && !attacker.isFirstTurn) return true;
-        }
-        return false;
-    }
-
-    private List<Card> GetValidAttackTargets()
-    {
-        List<Card> objects = enemyPlayer.field.FindAll(
-            card => card.Type == Card.CardType.Object);
-        bool hasProxy = objects.Exists(card => card.isProxy);
-
-        return objects.FindAll(card =>
-            !card.isEncrypted && (!hasProxy || card.isProxy));
+        Debug.LogWarning(
+            $"MlAgents: stage={decisionStage}で無効な選択 {choice} を受信しました。");
+        episodeInvalidSelections++;
+        AddReward(-0.02f);
+        BeginTurnDecision();
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        var d = actionsOut.DiscreteActions;
-        for (int i = 0; i < d.Length; i++) d[i] = 0;
+        var discreteActions = actionsOut.DiscreteActions;
+        if (discreteActions.Length == 0) return;
 
-        if (gm == null) return;
-
-        int actionType = gm.currentPhase == PhaseState.Start
-            ? (gm.systemTurn == 1 ? 0 : 1)
-            : 4;
+        int choice = GetDefaultHeuristicChoice();
         Keyboard keyboard = Keyboard.current;
-
-        // 1:Marigan 2:SelfGarbage 3:Play 4:Attack 5:End
         if (keyboard != null)
         {
-            if (keyboard.digit1Key.isPressed) actionType = 0;
-            else if (keyboard.digit2Key.isPressed) actionType = 1;
-            else if (keyboard.digit3Key.isPressed) actionType = 2;
-            else if (keyboard.digit4Key.isPressed) actionType = 3;
-            else if (keyboard.digit5Key.isPressed) actionType = 4;
+            if (keyboard.digit1Key.isPressed) choice = 0;
+            else if (keyboard.digit2Key.isPressed) choice = 1;
+            else if (keyboard.digit3Key.isPressed) choice = 2;
+            else if (keyboard.digit4Key.isPressed) choice = 3;
+            else if (keyboard.digit5Key.isPressed) choice = 4;
+            else if (keyboard.digit6Key.isPressed) choice = 5;
+            else if (keyboard.digit7Key.isPressed) choice = 6;
+            else if (keyboard.digit8Key.isPressed) choice = 7;
+            else if (keyboard.digit9Key.isPressed) choice = 8;
         }
-        d[0] = actionType;
 
-        int handIndex = 0;
-        if (keyboard != null && keyboard.wKey.isPressed) handIndex = 1;
-        else if (keyboard != null && keyboard.eKey.isPressed) handIndex = 2;
-        else if (keyboard != null && keyboard.rKey.isPressed) handIndex = 3;
-        d[1] = handIndex;
+        discreteActions[0] = choice;
+    }
 
-        d[2] = 0;
-        d[3] = 0;
-        Debug.Log($"【Heuristic】{gameObject.name} actionType:{actionType} handIndex:{handIndex}");
+    private int GetDefaultHeuristicChoice()
+    {
+        bool[] enabled = BuildEnabledActions();
+
+        if (decisionStage == DecisionStage.SelectAction && enabled[2]) return 2;
+
+        if ((decisionStage == DecisionStage.SelectMarigan ||
+             decisionStage == DecisionStage.SelectSelfGarbage ||
+             decisionStage == DecisionStage.SelectPlayTarget ||
+             decisionStage == DecisionStage.SelectAdditionalCost) && enabled[0])
+        {
+            return 0;
+        }
+
+        for (int i = 0; i < enabled.Length; i++)
+        {
+            if (enabled[i]) return i;
+        }
+
+        return 0;
     }
 }
