@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Netcode; // LocalBattleManagerがNetworkBehaviourを継承するため、基底クラスも対応可能にしておくのが無難です
+using Unity.Netcode;
 using UnityEngine;
 
 public abstract class BattleManager : NetworkBehaviour

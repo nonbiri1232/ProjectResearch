@@ -2,40 +2,39 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
 using DG.Tweening;
-
-// マウスの現在の状態を管理
 public enum InputState
 {
     Normal,         // 通常状態（ホバーのみ）
     DraggingHand,   // 手札をドラッグ中（プレイ準備）
     DraggingField,  // 場のカードをドラッグ中（攻撃準備）
-    SelectingTarget // 対象を選択中
+    SelectingTarget, // 対象を選択中
+    SelectingMarigan //マリガン選択中
 }
 
 public class PlayerInputManager : MonoBehaviour
 {
     [Header("Managers")]
-    public BattleManager battleManager;
+    public BattleManager battleManager; // DebugBattleManagerをアタッチする
     public BattleUIManager uiManager;
     public CardLayoutManager p1HandLayout;
+    public CardLayoutManager p1MariganLayout;
 
     [Header("UI Areas (Play)")]
-    public RectTransform normalPlayArea; // 通常プレイのドロップエリア
-    public RectTransform addCostPlayArea; // コスト+1プレイのドロップエリア
-    public GameObject playAreaUI; // ドラッグ中のみ表示するUIの親オブジェクト
+    public RectTransform normalPlayArea; 
+    public RectTransform addCostPlayArea; 
+    public GameObject playAreaUI; 
 
     [Header("Attack Line Settings")]
-    public LineRenderer attackLine; // 攻撃時の曲線を描画する線
-    public int lineResolution = 20; // 曲線の滑らかさ
+    public LineRenderer attackLine; 
+    public int lineResolution = 20; 
 
     private InputState currentState = InputState.Normal;
     private GameObject draggingCard = null;
     private CardView draggingCardView = null;
     
-    private Vector3 originalPos; // ドラッグ開始前の位置
+    private Vector3 originalPos; 
     private float zDistance;
 
-    // 選択モード用
     private int requiredTargetCount;
     private List<CardData> selectedTargets = new List<CardData>();
     private bool isPlayWithAddCost = false;
@@ -50,69 +49,99 @@ public class PlayerInputManager : MonoBehaviour
     {
         switch (currentState)
         {
-            case InputState.Normal:
-                HandleNormalState();
-                break;
-            case InputState.DraggingHand:
-                HandleDraggingHand();
-                break;
-            case InputState.DraggingField:
-                HandleDraggingField();
-                break;
-            case InputState.SelectingTarget:
-                HandleSelectingTarget();
-                break;
+            case InputState.Normal: HandleNormalState(); break;
+            case InputState.DraggingHand: HandleDraggingHand(); break;
+            case InputState.DraggingField: HandleDraggingField(); break;
+            case InputState.SelectingTarget: HandleSelectingTarget(); break;
+            case InputState.SelectingMarigan: HandleSelectingMarigan(); break;
         }
     }
+    public void StartMariganSelection()
+    {
+        currentState = InputState.SelectingMarigan;
+        selectedTargets.Clear();
+    }
+    public void ConfirmMarigan()
+    {
+        if (currentState != InputState.SelectingMarigan) return;
+        battleManager.SubmitMarigan(selectedTargets);
+        selectedTargets.Clear();
+        currentState = InputState.Normal;
+    }
+    private void HandleSelectingMarigan()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit))
+        {
+            if (hit.collider.CompareTag("Card"))
+            {
+                CardView view = hit.collider.GetComponent<CardView>();
+                if (view != null && uiManager != null) uiManager.ShowPopUp(view.AbilityText); // ホバー表示
+                
+                // クリック時
+                if (Input.GetMouseButtonDown(0))
+                {
+                    // マリガン領域にあるカードだけを選択可能にする
+                    if (p1MariganLayout != null && p1MariganLayout.FindCardObject(view.CurrentData) != null)
+                    {
+                        if (selectedTargets.Contains(view.CurrentData))
+                        {
+                            selectedTargets.Remove(view.CurrentData);
+                            view.SetHighlight(false);
+                        }
+                        else
+                        {
+                            selectedTargets.Add(view.CurrentData);
+                            view.SetHighlight(true);
+                        }
+                    }
+                }
+            }
+            else { if (uiManager != null) uiManager.HidePopUp(); }
+        }
+        else { if (uiManager != null) uiManager.HidePopUp(); }
+    }
 
-    // ==================================================
-    // 状態1: 通常時（ホバー検知とドラッグ開始）
-    // ==================================================
     private void HandleNormalState()
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
-            // 要件4: ホバー時の能力表示
             if (hit.collider.CompareTag("Card"))
             {
                 CardView view = hit.collider.GetComponent<CardView>();
-                if (view != null)
+                if (view != null && uiManager != null) uiManager.ShowPopUp(view.AbilityText); 
+
+                if (Input.GetMouseButtonDown(0) && battleManager.CanAct()) // ★CanAct()チェックを追加
                 {
-                    // CardView からテキストを取得してUIに渡す想定
-                    uiManager.ShowPopUp(view.AbilityText); 
+                    if (uiManager != null) uiManager.HidePopUp(); 
+                    BeginDrag(hit.collider.gameObject);
                 }
             }
             else
             {
-                uiManager.HidePopUp();
-            }
-
-            // ドラッグ開始判定
-            if (Input.GetMouseButtonDown(0) && hit.collider.CompareTag("Card"))
-            {
-                uiManager.HidePopUp(); // ドラッグ中はポップアップを消す
-                BeginDrag(hit.collider.gameObject);
+                if (uiManager != null) uiManager.HidePopUp();
             }
         }
         else
         {
-            uiManager.HidePopUp();
+            if (uiManager != null) uiManager.HidePopUp();
         }
     }
 
     private void BeginDrag(GameObject cardObj)
     {
+        cardObj.transform.DOKill();
+
         draggingCard = cardObj;
         draggingCardView = cardObj.GetComponent<CardView>();
         originalPos = cardObj.transform.position;
         zDistance = Camera.main.WorldToScreenPoint(originalPos).z;
 
-        // 手札かフィールドかで状態を分ける (CardView がどのエリアにいるかを持っている想定)
         if (draggingCardView.IsHandCard)
         {
             currentState = InputState.DraggingHand;
-            if (playAreaUI != null) playAreaUI.SetActive(true); // プレイ用UIを表示
+            if (playAreaUI != null) playAreaUI.SetActive(true);
         }
         else if (draggingCardView.IsFieldCard && draggingCardView.CurrentData.canAttackNow)
         {
@@ -121,15 +150,11 @@ public class PlayerInputManager : MonoBehaviour
         }
         else
         {
-            // 動かせないカードはすぐにリセット
             draggingCard = null;
             draggingCardView = null;
         }
     }
 
-    // ==================================================
-    // 状態2: 手札をドラッグ中（プレイ）
-    // ==================================================
     private void HandleDraggingHand()
     {
         UpdateCardPositionToMouse();
@@ -138,28 +163,42 @@ public class PlayerInputManager : MonoBehaviour
         {
             if (playAreaUI != null) playAreaUI.SetActive(false);
 
-            // UIとマウスが重なっているか判定
-            if (RectTransformUtility.RectangleContainsScreenPoint(addCostPlayArea, Input.mousePosition))
+            if (IsMouseOverRect(addCostPlayArea))
             {
-                AttemptPlay(true); // コスト+1 でプレイ
+                AttemptPlay(true);
             }
-            else if (RectTransformUtility.RectangleContainsScreenPoint(normalPlayArea, Input.mousePosition))
+            else if (IsMouseOverRect(normalPlayArea))
             {
-                AttemptPlay(false); // 通常プレイ
+                AttemptPlay(false);
+            }
+            else if (Input.mousePosition.y > Screen.height * 0.4f)
+            {
+                AttemptPlay(false);
             }
             else
             {
-                CancelDrag(); // UIに重ならなかったら元の位置へ戻る
+                CancelDrag(); // 枠外なら元の位置に戻る
             }
         }
     }
 
-    // ==================================================
-    // 状態3: 場のカードをドラッグ中（攻撃）
-    // ==================================================
+    private bool IsMouseOverRect(RectTransform rect)
+    {
+        if (rect == null) return false;
+        Camera cam = null;
+        Canvas canvas = rect.GetComponentInParent<Canvas>();
+        
+        if (canvas != null && (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace))
+        {
+            cam = canvas.worldCamera;
+            if (cam == null) cam = Camera.main;
+        }
+        
+        return RectTransformUtility.RectangleContainsScreenPoint(rect, Input.mousePosition, cam);
+    }
+
     private void HandleDraggingField()
     {
-        // カード自体は動かさず、曲線の矢印だけを描画する
         DrawAttackCurve(draggingCard.transform.position, Input.mousePosition);
 
         if (Input.GetMouseButtonUp(0))
@@ -172,31 +211,24 @@ public class PlayerInputManager : MonoBehaviour
                 if (hit.collider.CompareTag("Card"))
                 {
                     CardView targetView = hit.collider.GetComponent<CardView>();
-                    // 敵のフィールドのカードなら攻撃
                     if (targetView != null && !targetView.IsMyCard)
                     {
-                        Debug.Log("相手カードへ攻撃！");
-                        // battleManager.SubmitAttack(draggingCardView.CurrentData, targetView.CurrentData);
-                        // ↑ バトルマネージャーへ送信。その後、マネージャーがCardViewの戦闘エフェクトを呼び出す
+                        // ★送信を有効化
+                        battleManager.SubmitAttack(draggingCardView.CurrentData, targetView.CurrentData);
                     }
                 }
                 else if (hit.collider.CompareTag("EnemyPlayer"))
                 {
-                    Debug.Log("相手プレイヤーへダイレクトアタック！");
-                    // battleManager.SubmitDirectAttack(draggingCardView.CurrentData);
+                    // ★ダイレクトアタック
+                    battleManager.SubmitAttack(draggingCardView.CurrentData, null);
                 }
             }
-
-            CancelDrag(); // ドラッグ状態を解除（カードは動かしていないので元のままでOK）
+            CancelDrag();
         }
     }
 
-    // ==================================================
-    // 状態4: 対象選択中
-    // ==================================================
     private void HandleSelectingTarget()
     {
-        // 選択対象外の場所をクリックしたらキャンセルして盤面を戻す
         if (Input.GetMouseButtonDown(0))
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -205,7 +237,6 @@ public class PlayerInputManager : MonoBehaviour
                 CardView targetView = hit.collider.GetComponent<CardView>();
                 if (targetView != null)
                 {
-                    // 点滅エフェクトのオンオフ
                     if (selectedTargets.Contains(targetView.CurrentData))
                     {
                         selectedTargets.Remove(targetView.CurrentData);
@@ -216,7 +247,6 @@ public class PlayerInputManager : MonoBehaviour
                         selectedTargets.Add(targetView.CurrentData);
                         targetView.SetHighlight(true);
 
-                        // 規定枚数に達したらプレイ決定
                         if (selectedTargets.Count >= requiredTargetCount)
                         {
                             ConfirmPlayWithTargets();
@@ -226,15 +256,11 @@ public class PlayerInputManager : MonoBehaviour
             }
             else
             {
-                // 背景など関係ないところをクリックしたらキャンセル
                 CancelTargetSelection();
             }
         }
     }
 
-    // ==================================================
-    // 補助機能
-    // ==================================================
     private void UpdateCardPositionToMouse()
     {
         Vector3 mouseScreenPos = new Vector3(Input.mousePosition.x, Input.mousePosition.y, zDistance);
@@ -245,7 +271,6 @@ public class PlayerInputManager : MonoBehaviour
     {
         if (draggingCard != null)
         {
-            // DOTween でスッと元の位置に戻る演出
             draggingCard.transform.DOMove(originalPos, 0.25f).SetEase(Ease.OutCubic);
         }
         draggingCard = null;
@@ -253,33 +278,24 @@ public class PlayerInputManager : MonoBehaviour
         currentState = InputState.Normal;
     }
 
-    // プレイを実行（対象選択が必要か問い合わせる）
     private void AttemptPlay(bool isAddCost)
     {
         isPlayWithAddCost = isAddCost;
-        
-        // BattleManagerに「このカードは対象選択が必要か？何枚か？」を問い合わせる想定
         int targetCount = battleManager.RequiresTargetCount(draggingCardView.CurrentData);
 
         if (targetCount > 0)
         {
-            // 対象選択モードへ移行
             requiredTargetCount = targetCount;
             selectedTargets.Clear();
             currentState = InputState.SelectingTarget;
             
-            // LayoutManager に指示して、対象可能なカードを中央に並べてもらう
-            // p1HandLayout.BeginSelectionMode(validTargetIds); 
-            
-            // ※ドラッグしていた手札のカードは一旦非表示にするか、元の位置に戻しておく
+            // ★ここではデバッグ用に一時的にカードを見えなくする
             draggingCard.SetActive(false); 
         }
         else
         {
-            // そのままプレイ
-            Debug.Log($"カードをプレイ！ (コスト追加: {isAddCost})");
-            // battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, null);
-            
+            // ★対象不要なら即プレイ送信
+            battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, null);
             draggingCard = null;
             draggingCardView = null;
             currentState = InputState.Normal;
@@ -288,19 +304,12 @@ public class PlayerInputManager : MonoBehaviour
 
     private void ConfirmPlayWithTargets()
     {
-        Debug.Log("対象を選んでカードをプレイ！");
-        // battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, selectedTargets);
+        // ★ターゲット付きでプレイ送信
+        battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, selectedTargets);
 
-        // 選択演出の解除
-        foreach (var data in selectedTargets)
-        {
-            // FindCardObjectして SetHighlight(false) する処理
-        }
+        foreach (var data in selectedTargets) { /* Highlight解除処理 */ }
 
-        // LayoutManager に並びを元に戻してもらう
-        // p1HandLayout.EndSelectionMode();
-
-        draggingCard.SetActive(true); // 隠していたカードを戻す（プレイされて移動する）
+        draggingCard.SetActive(true);
         draggingCard = null;
         draggingCardView = null;
         currentState = InputState.Normal;
@@ -308,24 +317,18 @@ public class PlayerInputManager : MonoBehaviour
 
     private void CancelTargetSelection()
     {
-        Debug.Log("カードのプレイをキャンセルしました。");
-        // p1HandLayout.EndSelectionMode(); // 盤面を元に戻す
-
-        foreach (var data in selectedTargets) { /* ハイライト解除 */ }
-        
+        p1HandLayout.EndSelectionMode();
+        foreach (var data in selectedTargets) { /* Highlight解除処理 */ }
         draggingCard.SetActive(true);
         CancelDrag();
     }
 
-    // ベジェ曲線を描画して攻撃の矢印を表現
     private void DrawAttackCurve(Vector3 startWorldPos, Vector3 mouseScreenPos)
     {
         mouseScreenPos.z = zDistance;
         Vector3 endWorldPos = Camera.main.ScreenToWorldPoint(mouseScreenPos);
-        
-        // 制御点（中間地点から少し上方向に膨らませる）
         Vector3 controlPos = (startWorldPos + endWorldPos) / 2f;
-        controlPos.y += 2.0f; // 膨らみ具合
+        controlPos.y += 2.0f;
 
         attackLine.positionCount = lineResolution + 1;
         for (int i = 0; i <= lineResolution; i++)
@@ -341,9 +344,9 @@ public class PlayerInputManager : MonoBehaviour
         float u = 1 - t;
         float tt = t * t;
         float uu = u * u;
-        Vector3 p = uu * p0; // (1-t)^2 * P0
-        p += 2 * u * t * p1; // 2(1-t)t * P1
-        p += tt * p2;        // t^2 * P2
+        Vector3 p = uu * p0; 
+        p += 2 * u * t * p1; 
+        p += tt * p2;        
         return p;
     }
 }

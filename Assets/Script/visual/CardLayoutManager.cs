@@ -40,14 +40,14 @@ public class CardLayoutManager : MonoBehaviour
     private List<CardData> cards = new List<CardData>();
     private List<GameObject> fieldClone = new List<GameObject>();
 
-    private void Start()
+    private void Awake()
     {
         Initialize();
     }
 
-    public void CreateIntantiate(CardData data)
+    public void CreateCard(CardData data)
     {
-        GameObject cardObj = Instantiate(cardPrefab, leftTop, Quaternion.identity);
+        GameObject cardObj = Instantiate(cardPrefab, leftTop, Quaternion.identity,drawField);
 
         CardView view = cardObj.GetComponent<CardView>();
         if(view != null)
@@ -73,6 +73,7 @@ public class CardLayoutManager : MonoBehaviour
         Vector3[] corners = new Vector3[4];
         drawField.GetWorldCorners(corners);
         leftTop = corners[1];
+        leftTop.z = 0;
         worldWidth = corners[2].x - corners[1].x;
         worldHeight = corners[1].y - corners[0].y;
 
@@ -156,6 +157,7 @@ public class CardLayoutManager : MonoBehaviour
             GameObject card = fieldClone[i];
             Vector3 pos = cardPos[i];
 
+            card.transform.DOKill();
             card.transform.DOMove(pos, 0.25f).SetEase(Ease.OutExpo);
             card.transform.DOScale(targetScale, 0.25f).SetEase(Ease.OutExpo);
             card.transform.DORotate(targetRot, 0.25f).SetEase(Ease.OutExpo);
@@ -205,6 +207,8 @@ public class CardLayoutManager : MonoBehaviour
     private void MoveCard(GameObject card, FieldType sourceType, int targetIndex)
     {
         if (targetIndex >= cardPos.Length) return;
+
+        card.transform.DOKill();
 
         Vector3 targetPosVec = cardPos[targetIndex];
         Vector3 targetRot = isFaceDown ? new Vector3(0, 180, 0) : Vector3.zero;
@@ -274,7 +278,10 @@ public class CardLayoutManager : MonoBehaviour
         foreach(var obj in fieldClone)
         {
             CardView view = obj.GetComponent<CardView>();
-            if(view.CurrentData.uniqueId == data.uniqueId);
+            if(view.CurrentData.uniqueId == data.uniqueId)
+            {
+                return obj;
+            }
         }
         return null;
     }

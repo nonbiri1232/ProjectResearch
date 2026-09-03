@@ -15,7 +15,9 @@ public struct CardData : INetworkSerializable
     // 通信で送るためのパッキング処理
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
+        serializer.SerializeValue(ref uniqueId);
         serializer.SerializeValue(ref id);
+        serializer.SerializeValue(ref type);
         serializer.SerializeValue(ref cost);
         serializer.SerializeValue(ref atk);
         serializer.SerializeValue(ref hp);

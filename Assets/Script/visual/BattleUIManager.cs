@@ -8,6 +8,7 @@ public class BattleUIManager : MonoBehaviour
 {
     [Header("System")]
     public BattleManager battleManager;
+    public PlayerInputManager inputManager;
     public Button endTurnButton;
     public TextMeshProUGUI systemText;
 
@@ -28,6 +29,7 @@ public class BattleUIManager : MonoBehaviour
     public GameObject witchPlay;
     public GameObject SelectCard;
     public GameObject MariganField;
+    public Button mariganConfirmButton;
     [Header("Card DBS")]
     public CardConect cardDatabase;
     [Header("Card PopUp")]
@@ -36,6 +38,17 @@ public class BattleUIManager : MonoBehaviour
     [Header("End Game")]
     public GameObject endGame;
     public TextMeshProUGUI endText;
+    private void Start()
+    {
+        if (mariganConfirmButton != null) 
+        {
+            mariganConfirmButton.onClick.AddListener(() => DecideMarigan());
+        }
+        if(endTurnButton != null)
+        {
+            endTurnButton.onClick.AddListener(()=>OnEndTurnClicked());
+        }
+    }
     private void GameEnd(bool win)
     {
         endGame.SetActive(true);
@@ -48,19 +61,26 @@ public class BattleUIManager : MonoBehaviour
             endText.text = "敗北";
         }
     }
-    
-    private void ShowMarigan()
+    private void DecideMarigan()
     {
-        
+        mariganConfirmButton.gameObject.SetActive(false);
+        inputManager.ConfirmMarigan();
     }
-    private void HideMarigan()
+    
+    public void ShowMarigan()
     {
-        
+        if (MariganField != null) MariganField.SetActive(true);
+        if (mariganConfirmButton != null) mariganConfirmButton.gameObject.SetActive(true);
+    }
+
+    public void HideMarigan()
+    {
+        if (MariganField != null) MariganField.SetActive(false);
+        if (mariganConfirmButton != null) mariganConfirmButton.gameObject.SetActive(false);
     }
     public void OnEndTurnClicked()
     {
-        PlayerAction action = new PlayerAction();
-        action.type = ActionType.End;
+        battleManager.SubmitEndTurn();
     }
     public void UpdateUI(GameManager gm,Player self,Player enemy)
     {
