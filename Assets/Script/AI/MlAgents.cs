@@ -298,11 +298,18 @@ public class MlAgents : Agent
                 break;
 
             case DecisionStage.SelectAttackSource:
+                bool hasAttackSource = false;
                 for (int i = 0; i < myPlayer.field.Count && i < MaxFieldSize; i++)
                 {
                     enabled[i + 1] = LegalActionGenerator.CanAttack(
                         gm, myPlayer, enemyPlayer, myPlayer.field[i]);
+                    hasAttackSource |= enabled[i + 1];
                 }
+
+                // The board can change between the action-type decision and this
+                // follow-up decision. Fall back to the existing cancel action so
+                // ML-Agents never receives a fully masked action branch.
+                if (!hasAttackSource) enabled[0] = true;
                 break;
 
             case DecisionStage.SelectAttackTarget:
@@ -342,6 +349,10 @@ public class MlAgents : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
+        // ML-Agents can invoke CollectObservations while the Agent is being
+        // disabled during a scene change, after its VectorSensor was released.
+        if (sensor == null) return;
+
         if (myPlayer == null || enemyPlayer == null || gm == null)
         {
             for (int i = 0; i < ObservationSize; i++)

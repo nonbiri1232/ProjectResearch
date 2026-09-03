@@ -136,6 +136,20 @@ public class AIBattleManager : MonoBehaviour
 
         if (useBasicDeckWhenInvalid)
         {
+            // The old basic fallback consists of plain Card instances and has no
+            // card abilities.  Prefer a real catalog deck so an empty PlayerPrefs
+            // save on a new PC does not silently create an effect-less match.
+            if (aiDeckCatalog != null &&
+                aiDeckCatalog.TryCreateRandomDeck(
+                    new List<int> { 0 }, out List<Card> catalogFallback,
+                    out int fallbackDeckId))
+            {
+                Debug.LogWarning(
+                    $"保存デッキが見つからないため、実カードのDeck ID: {fallbackDeckId}を使用します。" +
+                    "自作デッキを使うにはデッキ作成画面でDeck 1を保存してください。");
+                return catalogFallback;
+            }
+
             return DeckManager.CreateBasicCardDeck();
         }
 
