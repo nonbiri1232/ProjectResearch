@@ -1,17 +1,22 @@
-using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.MLAgents;
 using Unity.MLAgents.Policies;
 
 /// <summary>
-/// AI同士（ML-Agents）の自動対戦を管理し、勝率を集計するマネージャー。
+/// 新AI・旧AIを自由に組み合わせて自動対戦を管理し、勝率を集計するマネージャー。
 /// 描画（UI）処理を完全に排除し、高速なシミュレーションに特化しています。
 /// </summary>
 public class AIAIBattleManager : MonoBehaviour
 {
-    [Header("AI Agents")]
-    [SerializeField] private MlAgents aiAgent1; // 1P側のAI
-    [SerializeField] private MlAgents aiAgent2; // 2P側のAI
+    [Header("AI 1 (1P側) - どちらか片方をセット")]
+    [SerializeField] private MlAgents ai1_New; 
+    [SerializeField] private LegacyMlAgents ai1_Legacy; 
+
+    [Header("AI 2 (2P側) - どちらか片方をセット")]
+    [SerializeField] private MlAgents ai2_New; 
+    [SerializeField] private LegacyMlAgents ai2_Legacy; 
 
     [Header("Match Settings")]
     [Tooltip("自動で対戦を行う最大回数")]
@@ -32,21 +37,24 @@ public class AIAIBattleManager : MonoBehaviour
     public int AI1Wins { get; private set; }
     public int AI2Wins { get; private set; }
 
+    // エラー防止用のフラグ
+    private bool isStartingNextMatch;
+
     private void Start()
     {
-        if (aiAgent1 == null || aiAgent2 == null)
+        // どちらのAIもセットされていない場合はエラー
+        if ((ai1_New == null && ai1_Legacy == null) || (ai2_New == null && ai2_Legacy == null))
         {
-            Debug.LogError("AIAIBattleManager: aiAgent1 または aiAgent2 が設定されていません。");
+            Debug.LogError("AIAIBattleManager: 1P側または2P側のAIが設定されていません。");
             enabled = false;
             return;
         }
 
-        // ★超高速化: Unityのゲーム進行スピードを100倍にする
-        // (ML-Agentsの学習/推論を高速で回すための定石です)
+        // 超高速化: Unityのゲーム進行スピードを100倍にする
         Time.timeScale = 100f; 
 
         Debug.Log($"【AI自動対戦】 描画なし・高速モードで {maxMatches}回のテストを開始します。");
-        StartBattle();
+        StartNewMatch();
     }
 
     private void OnDestroy()
@@ -60,14 +68,16 @@ public class AIAIBattleManager : MonoBehaviour
         Time.timeScale = 1f; 
     }
 
-    private void StartBattle()
+    public void StartNewMatch()
     {
+        isStartingNextMatch = false;
+
         if (gm != null)
         {
             gm.OnGameFinished -= HandleGameFinished;
         }
 
-        // AI1とAI2のデッキをそれぞれ構築する
+        // デッキの構築
         List<Card> ai1Deck = BuildAIDeck(ai1DeckIds);
         List<Card> ai2Deck = BuildAIDeck(ai2DeckIds);
 
@@ -79,17 +89,33 @@ public class AIAIBattleManager : MonoBehaviour
         Player first = p1GoesFirst ? aiPlayer1 : aiPlayer2;
         Player second = p1GoesFirst ? aiPlayer2 : aiPlayer1;
 
-        // ゲームマネージャーの初期化とイベント購読
         gm = new GameManager(first, second);
+
+        // 1P側の初期化（新旧どちらがセットされているかで分岐）
+        if (ai1_New != null)
+        {
+            ConfigureAgentBehavior(ai1_New);
+            ai1_New.Initialize(aiPlayer1, aiPlayer2, gm);
+        }
+        else if (ai1_Legacy != null)
+        {
+            ConfigureAgentBehavior(ai1_Legacy);
+            ai1_Legacy.Initialize(aiPlayer1, aiPlayer2, gm);
+        }
+
+        // 2P側の初期化（新旧どちらがセットされているかで分岐）
+        if (ai2_New != null)
+        {
+            ConfigureAgentBehavior(ai2_New);
+            ai2_New.Initialize(aiPlayer2, aiPlayer1, gm);
+        }
+        else if (ai2_Legacy != null)
+        {
+            ConfigureAgentBehavior(ai2_Legacy);
+            ai2_Legacy.Initialize(aiPlayer2, aiPlayer1, gm);
+        }
+
         gm.OnGameFinished += HandleGameFinished;
-
-        // AIの振る舞いを設定（学習用か推論用か）
-        ConfigureAgentBehavior(aiAgent1);
-        ConfigureAgentBehavior(aiAgent2);
-
-        // 各AIに、自分と相手のプレイヤー情報、およびGameManagerを渡して初期化
-        aiAgent1.Initialize(aiPlayer1, aiPlayer2, gm);
-        aiAgent2.Initialize(aiPlayer2, aiPlayer1, gm);
     }
 
     private List<Card> BuildAIDeck(List<int> deckIds)
@@ -102,25 +128,23 @@ public class AIAIBattleManager : MonoBehaviour
         return DeckManager.CreateBasicCardDeck();
     }
 
-    private void ConfigureAgentBehavior(MlAgents agent)
+    // Agent（ML-Agentsの基底クラス）を受け取るように変更し、新旧両方に対応
+    private void ConfigureAgentBehavior(Agent agent)
     {
         BehaviorParameters behavior = agent.GetComponent<BehaviorParameters>();
-        if (behavior == null)
+        if (behavior != null)
         {
-            Debug.LogError($"{agent.name} に BehaviorParameters がありません。");
-            enabled = false;
-            return;
+            behavior.BehaviorType = BehaviorType.Default; 
         }
-        
-        // 自動対戦時は環境に合わせて Default か InferenceOnly を設定します
-        behavior.BehaviorType = BehaviorType.Default; 
     }
 
     private void HandleGameFinished(Player winner)
     {
+        if (isStartingNextMatch) return;
+        isStartingNextMatch = true;
+
         CompletedMatches++;
 
-        // 勝敗の集計
         if (winner == aiPlayer1)
         {
             AI1Wins++;
@@ -130,7 +154,6 @@ public class AIAIBattleManager : MonoBehaviour
             AI2Wins++;
         }
 
-        // ★高速化: 100戦ごとだとログが多すぎるので、1000戦ごとにログを出力
         if (CompletedMatches % 1000 == 0 || CompletedMatches >= maxMatches)
         {
             float winRate1 = (float)AI1Wins / CompletedMatches * 100f;
@@ -141,15 +164,20 @@ public class AIAIBattleManager : MonoBehaviour
                       $"AI 2 (勝率: {winRate2:F2}%) - {AI2Wins}勝");
         }
 
-        // 指定回数に到達していなければ、次のゲームを自動で即座に開始する
         if (CompletedMatches < maxMatches)
         {
-            StartBattle();
+            StartCoroutine(StartNextMatchCoroutine());
         }
         else
         {
             Debug.Log("【テスト完了】10万回のAI対戦が終了しました。");
-            Time.timeScale = 1f; // 終わったらゲーム時間を元に戻す
+            Time.timeScale = 1f; 
         }
+    }
+
+    private IEnumerator StartNextMatchCoroutine()
+    {
+        yield return null;
+        StartNewMatch();
     }
 }

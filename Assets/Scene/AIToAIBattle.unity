@@ -211,6 +211,38 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &973017957 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7024614544054199526, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+  m_PrefabInstance: {fileID: 8612143760476088092}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80e7f72c027fe2c47a80cf595a8838c1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MlAgents
+--- !u!1 &1824890306 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6280807735437187842, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+  m_PrefabInstance: {fileID: 8612143760476088092}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1824890307
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1824890306}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1a7c3d95b2f4a6e8c1042739d5f6b81, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LegacyMlAgents
+  agentParameters:
+    maxStep: 0
+  hasUpgradedFromAgentParameters: 1
+  MaxStep: 0
 --- !u!1001 &8612143760476088092
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -511,10 +543,38 @@ PrefabInstance:
       propertyPath: 'm_BrainParameters.m_ActionSpec.BranchSizes.Array.data[27]'
       value: 2
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    - target: {fileID: 5034766461636650303, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      propertyPath: ai1_New
+      value: 
+      objectReference: {fileID: 973017957}
+    - target: {fileID: 5034766461636650303, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      propertyPath: aiAgent1
+      value: 
+      objectReference: {fileID: 973017957}
+    - target: {fileID: 5034766461636650303, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      propertyPath: aiAgent2
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 5034766461636650303, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      propertyPath: ai2_Legacy
+      value: 
+      objectReference: {fileID: 1824890307}
+    - target: {fileID: 6280807735437187842, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      propertyPath: m_Name
+      value: AgentB
+      objectReference: {fileID: 0}
+    - target: {fileID: 8601143679359182429, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      propertyPath: m_Name
+      value: AgentA
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: 3868259002235481669, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6280807735437187842, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1824890307}
   m_SourcePrefab: {fileID: 100100000, guid: d242927b0b94ec04699006b914ad39f7, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
