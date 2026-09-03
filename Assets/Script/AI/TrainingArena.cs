@@ -38,6 +38,8 @@ public class TrainingArena : MonoBehaviour
     private RuleBasedController ruleBasedOpponent;
     private bool isStartingNextMatch;
     private int completedMatches;
+    private int currentDeckAId = -1;
+    private int currentDeckBId = -1;
 
     private void Start()
     {
@@ -66,6 +68,8 @@ public class TrainingArena : MonoBehaviour
         List<Card> deckB = BuildAIDeck(
             agentBDeckIds, useSavedDecks ? DeckManager.player2Deck : null,
             out int deckBId);
+        currentDeckAId = deckAId;
+        currentDeckBId = deckBId;
 
         playerA = new Player(deckA);
         playerB = new Player(deckB);
@@ -106,6 +110,16 @@ public class TrainingArena : MonoBehaviour
         stats.Add("CardGame/Match/SystemTurns", gm.systemTurn);
         stats.Add("CardGame/Match/OpponentMode", (float)opponentMode,
             StatAggregationMethod.MostRecent);
+        stats.Add("CardGame/Match/DeckAId", currentDeckAId,
+            StatAggregationMethod.MostRecent);
+        stats.Add("CardGame/Match/DeckBId", currentDeckBId,
+            StatAggregationMethod.MostRecent);
+
+        string matchupPrefix =
+            $"CardGame/Matchups/{FormatDeckId(currentDeckAId)}_vs_" +
+            FormatDeckId(currentDeckBId);
+        stats.Add(matchupPrefix + "/AgentAWin", winner == playerA ? 1f : 0f);
+        stats.Add(matchupPrefix + "/SystemTurns", gm.systemTurn);
 
         StartCoroutine(StartNextMatch());
     }

@@ -7,8 +7,7 @@ using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 
 // Action Spec: Discrete Branches = [21]
-// 報酬定義実験: mlagents-learn ml-agents-configs/reward_based_selfplay_config.yaml --run-id=
-// 比較用ベースライン: mlagents-learn ml-agents-configs/terminal_only_selfplay_config.yaml --run-id=
+// 10M比較実験はml-agents-configs/*_10m_config.yamlを使用する。
 public class MlAgents : Agent
 {
     private enum DecisionStage
@@ -27,10 +26,15 @@ public class MlAgents : Agent
     public Player enemyPlayer;
     public GameManager gm;
 
-    [Header("Win Progress Reward")]
+    [Header("Reward Settings (YAML overrides)")]
     [FormerlySerializedAs("boardRewardScale")]
-    [SerializeField, Range(0f, 0.2f)]
+    [SerializeField, Range(0f, 1f)]
     private float memoryProgressRewardScale = 0.05f;
+    [SerializeField] private float terminalWinReward = 1.0f;
+    [SerializeField] private float terminalLossReward = -1.0f;
+    [SerializeField] private float validActionReward = -0.001f;
+    [SerializeField] private float failedActionReward = -0.05f;
+    [SerializeField] private float invalidSelectionReward = -0.02f;
 
     private const int ActionBranchSize = 21;
     private const int ObservationSize = 947;
@@ -66,6 +70,16 @@ public class MlAgents : Agent
             .GetWithDefault(
                 "memory_progress_reward_scale",
                 memoryProgressRewardScale);
+        terminalWinReward = GetEnvironmentParameter(
+            "terminal_win_reward", terminalWinReward);
+        terminalLossReward = GetEnvironmentParameter(
+            "terminal_loss_reward", terminalLossReward);
+        validActionReward = GetEnvironmentParameter(
+            "valid_action_reward", validActionReward);
+        failedActionReward = GetEnvironmentParameter(
+            "failed_action_reward", failedActionReward);
+        invalidSelectionReward = GetEnvironmentParameter(
+            "invalid_selection_reward", invalidSelectionReward);
         lastTick = manager != null ? manager.decisionTick - 1 : -1;
         ResetPendingDecision();
         lastMemoryAdvantage = BoardEvaluator.Evaluate(me, enemy, manager);
@@ -79,6 +93,28 @@ public class MlAgents : Agent
         Academy.Instance.StatsRecorder.Add(
             GetStatsPrefix() + "/MemoryRewardScale",
             memoryProgressRewardScale,
+            StatAggregationMethod.MostRecent);
+        RecordRewardSettings();
+    }
+
+    private static float GetEnvironmentParameter(string name, float fallback)
+    {
+        return Academy.Instance.EnvironmentParameters.GetWithDefault(name, fallback);
+    }
+
+    private void RecordRewardSettings()
+    {
+        StatsRecorder stats = Academy.Instance.StatsRecorder;
+        string prefix = GetStatsPrefix() + "/RewardSettings";
+        stats.Add(prefix + "/TerminalWin", terminalWinReward,
+            StatAggregationMethod.MostRecent);
+        stats.Add(prefix + "/TerminalLoss", terminalLossReward,
+            StatAggregationMethod.MostRecent);
+        stats.Add(prefix + "/ValidAction", validActionReward,
+            StatAggregationMethod.MostRecent);
+        stats.Add(prefix + "/FailedAction", failedActionReward,
+            StatAggregationMethod.MostRecent);
+        stats.Add(prefix + "/InvalidSelection", invalidSelectionReward,
             StatAggregationMethod.MostRecent);
     }
 
@@ -163,9 +199,9 @@ public class MlAgents : Agent
 
         Debug.Log($"【学習】対局終了。勝者: {(winner == myPlayer ? "自分" : "相手")}");
         if (winner == myPlayer)
-            AddReward(1.0f);
+            AddReward(terminalWinReward);
         else if (winner == enemyPlayer)
-            AddReward(-1.0f);
+            AddReward(terminalLossReward);
 
         StatsRecorder stats = Academy.Instance.StatsRecorder;
         string prefix = GetStatsPrefix();
@@ -479,7 +515,7 @@ public class MlAgents : Agent
         if (discreteActions.Length != 1)
         {
             Debug.LogError("MlAgentsのDiscrete Branchはサイズ21の1個に設定してください。");
-            AddReward(-0.05f);
+            AddReward(invalidSelectionReward);
             return;
         }
 
@@ -680,12 +716,12 @@ public class MlAgents : Agent
         if (!isCorrect)
         {
             episodeExecutedActions--;
-            AddReward(-0.05f);
+            AddReward(failedActionReward);
         }
         else if (gm.currentState != GameState.Finished)
         {
             ApplyMemoryProgressReward();
-            AddReward(-0.001f);
+            AddReward(validActionReward);
         }
     }
 
@@ -694,7 +730,7 @@ public class MlAgents : Agent
         Debug.LogWarning(
             $"MlAgents: stage={decisionStage}で無効な選択 {choice} を受信しました。");
         episodeInvalidSelections++;
-        AddReward(-0.02f);
+        AddReward(invalidSelectionReward);
         BeginTurnDecision();
     }
 
