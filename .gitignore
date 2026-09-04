@@ -120,7 +120,9 @@ ml_env/
 .pytest_cache/
 
 # ML-Agents generated training output (configs and selected ONNX assets stay tracked)
-/[Rr]esults/
+# Keep the human-readable experiment index available to collaborators.
+/[Rr]esults/*
+!/[Rr]esults/学習データ一覧.txt
 /[Mm]l-agents-configs/[Rr]esults/
 /[Aa]ssets/ML-Agents/Timers/
 **/events.out.tfevents.*
