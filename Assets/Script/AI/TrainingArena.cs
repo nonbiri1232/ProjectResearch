@@ -32,6 +32,10 @@ public class TrainingArena : MonoBehaviour
     [Tooltip("カタログから選べない場合に保存済みデッキを使う")]
     [SerializeField] private bool useSavedDecks = false;
 
+    [Header("Safety Limits")]
+    [Tooltip("このsystemTurn数に達した学習対局を引き分けで終了。0以下なら無制限")]
+    [SerializeField] private int maxSystemTurns = 200;
+
     private GameManager gm;
     private Player playerA;
     private Player playerB;
@@ -51,6 +55,22 @@ public class TrainingArena : MonoBehaviour
             DeckManager.LoadDeck();
         }
         StartNewMatch();
+    }
+
+    private void Update()
+    {
+        if (gm == null || isStartingNextMatch || maxSystemTurns <= 0 ||
+            gm.currentState == GameState.Finished)
+        {
+            return;
+        }
+
+        if (gm.systemTurn >= maxSystemTurns)
+        {
+            Debug.LogWarning(
+                $"【学習】{maxSystemTurns} system turnsに達したため引き分けで終了します。");
+            gm.FinishAsDraw();
+        }
     }
 
     public void StartNewMatch()
@@ -106,7 +126,9 @@ public class TrainingArena : MonoBehaviour
         completedMatches++;
 
         StatsRecorder stats = Academy.Instance.StatsRecorder;
-        stats.Add("CardGame/Match/AgentAWin", winner == playerA ? 1f : 0f);
+        stats.Add("CardGame/Match/AgentAWin",
+            winner == null ? 0.5f : winner == playerA ? 1f : 0f);
+        stats.Add("CardGame/Match/Draw", winner == null ? 1f : 0f);
         stats.Add("CardGame/Match/SystemTurns", gm.systemTurn);
         stats.Add("CardGame/Match/OpponentMode", (float)opponentMode,
             StatAggregationMethod.MostRecent);

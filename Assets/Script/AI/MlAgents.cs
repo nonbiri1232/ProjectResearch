@@ -527,6 +527,11 @@ public class MlAgents : Agent
             return;
         }
 
+        ApplySelectedChoice(choice);
+    }
+
+    private void ApplySelectedChoice(int choice)
+    {
         switch (decisionStage)
         {
             case DecisionStage.SelectAction:
@@ -731,7 +736,53 @@ public class MlAgents : Agent
             $"MlAgents: stage={decisionStage}で無効な選択 {choice} を受信しました。");
         episodeInvalidSelections++;
         AddReward(invalidSelectionReward);
-        BeginTurnDecision();
+
+        // A mask can become stale when multiple decision stages are requested in
+        // the same frame. Re-requesting the same decision here lets a collapsed
+        // policy select the same invalid action forever, so execute a currently
+        // legal fallback instead. At the top level, ending the turn is always the
+        // safest fallback and guarantees that the match continues.
+        bool[] enabled = BuildEnabledActions();
+        int fallbackChoice = -1;
+        if (decisionStage == DecisionStage.SelectAction && enabled[2])
+        {
+            fallbackChoice = 2;
+        }
+        else if (enabled[0])
+        {
+            fallbackChoice = 0;
+        }
+        else
+        {
+            for (int i = 1; i < enabled.Length; i++)
+            {
+                if (!enabled[i]) continue;
+                fallbackChoice = i;
+                break;
+            }
+        }
+
+        if (fallbackChoice >= 0)
+        {
+            Debug.LogWarning(
+                $"MlAgents: 合法なフォールバック {fallbackChoice} を実行します。");
+            ApplySelectedChoice(fallbackChoice);
+            return;
+        }
+
+        // This should not be reachable because every stage provides either an
+        // action or a cancel choice. Finish the whole match so TrainingArena can
+        // start a fresh one instead of leaving the other agent behind.
+        Debug.LogError($"MlAgents: stage={decisionStage}に合法な行動がありません。対局を引き分けで終了します。");
+        if (gm != null && gm.currentState != GameState.Finished)
+        {
+            gm.FinishAsDraw();
+        }
+        else
+        {
+            episodeFinished = true;
+            EndEpisode();
+        }
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)

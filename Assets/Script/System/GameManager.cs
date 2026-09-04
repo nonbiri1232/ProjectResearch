@@ -225,6 +225,14 @@ public class GameManager
         OnGameFinished?.Invoke(winner);
     }
 
+    public void FinishAsDraw()
+    {
+        if (currentState == GameState.Finished) return;
+        winner = null;
+        currentState = GameState.Finished;
+        OnGameFinished?.Invoke(null);
+    }
+
     public bool NeedsMarigan(Player p)
     {
         return systemTurn == 1 && Didmarigan.Contains(p);
