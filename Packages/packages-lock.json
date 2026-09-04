@@ -1,5 +1,26 @@
 {
   "dependencies": {
+    "com.cysharp.magiconion.client.unity": {
+      "version": "https://github.com/Cysharp/MagicOnion.git?path=src/MagicOnion.Client.Unity/Assets/Scripts/MagicOnion.Client.Unity#7.10.2",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "44f8b4048068a170d0c9cddd84618e0bfa52cc6b"
+    },
+    "com.cysharp.yetanotherhttphandler": {
+      "version": "https://github.com/Cysharp/YetAnotherHttpHandler.git?path=src/YetAnotherHttpHandler#1.11.5",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "3efebda78d62d3b484e6da2f2edb523a08d6786a"
+    },
+    "com.github-glitchenzo.nugetforunity": {
+      "version": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "acc1c7bc9ea34c33b830e40316fca52553878d29"
+    },
     "com.unity.2d.animation": {
       "version": "14.0.3",
       "depth": 1,
@@ -212,16 +233,15 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ml-agents": {
-      "version": "4.0.3",
+      "version": "file:com.unity.ml-agents",
       "depth": 0,
-      "source": "registry",
+      "source": "embedded",
       "dependencies": {
         "com.unity.ai.inference": "2.6.1",
-        "com.unity.modules.physics": "1.0.0",
+        "com.unity.modules.imageconversion": "1.0.0",
         "com.unity.modules.jsonserialize": "1.0.0",
-        "com.unity.modules.imageconversion": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
+        "com.unity.modules.physics": "1.0.0"
+      }
     },
     "com.unity.multiplayer.center": {
       "version": "1.0.1",
