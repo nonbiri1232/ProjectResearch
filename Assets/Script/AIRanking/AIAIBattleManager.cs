@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Policies;
+using System.Text;
+using System.IO;
 
 /// <summary>
 /// 新AI・旧AIを自由に組み合わせて自動対戦を管理し、勝率を集計するマネージャー。
@@ -40,6 +42,18 @@ public class AIAIBattleManager : MonoBehaviour
     // エラー防止用のフラグ
     private bool isStartingNextMatch;
 
+    //この試合で使用しているデッキ
+    int currentp1DeckId;
+    int currentp2DeckId;
+    public class MatchupStat
+    {
+        public int MatchesCount;
+        public int P1Wins;
+        public int P2Wins;
+    }
+
+    private Dictionary<(int, int), MatchupStat> matchupStats = new Dictionary<(int, int), MatchupStat>();
+
     private void Start()
     {
         // どちらのAIもセットされていない場合はエラー
@@ -50,8 +64,8 @@ public class AIAIBattleManager : MonoBehaviour
             return;
         }
 
-        // 超高速化: Unityのゲーム進行スピードを100倍にする
-        Time.timeScale = 100f; 
+        // 超高速化: Unityのゲーム進行スピードをn倍にする
+        Time.timeScale = 20f; 
 
         Debug.Log($"【AI自動対戦】 描画なし・高速モードで {maxMatches}回のテストを開始します。");
         StartNewMatch();
@@ -78,8 +92,14 @@ public class AIAIBattleManager : MonoBehaviour
         }
 
         // デッキの構築
-        List<Card> ai1Deck = BuildAIDeck(ai1DeckIds);
-        List<Card> ai2Deck = BuildAIDeck(ai2DeckIds);
+        List<Card> ai1Deck = BuildAIDeck(ai1DeckIds,out currentp1DeckId);
+        List<Card> ai2Deck = BuildAIDeck(ai2DeckIds,out currentp2DeckId);
+
+        var matchKey = (currentp1DeckId,currentp2DeckId);
+        if (!matchupStats.ContainsKey(matchKey))
+        {
+            matchupStats[matchKey] = new MatchupStat();
+        }
 
         aiPlayer1 = new Player(ai1Deck);
         aiPlayer2 = new Player(ai2Deck);
@@ -118,10 +138,11 @@ public class AIAIBattleManager : MonoBehaviour
         gm.OnGameFinished += HandleGameFinished;
     }
 
-    private List<Card> BuildAIDeck(List<int> deckIds)
+    private List<Card> BuildAIDeck(List<int> deckIds, out int selectedDeckId)
     {
+        selectedDeckId = -1;
         if (aiDeckCatalog != null &&
-            aiDeckCatalog.TryCreateRandomDeck(deckIds, out List<Card> deck, out int _))
+            aiDeckCatalog.TryCreateRandomDeck(deckIds, out List<Card> deck, out selectedDeckId))
         {
             return deck;
         }
@@ -145,13 +166,18 @@ public class AIAIBattleManager : MonoBehaviour
 
         CompletedMatches++;
 
+        var matchKey = (currentp1DeckId, currentp2DeckId);
+        matchupStats[matchKey].MatchesCount++;
+
         if (winner == aiPlayer1)
         {
             AI1Wins++;
+            matchupStats[matchKey].P1Wins++;
         }
         else if (winner == aiPlayer2)
         {
             AI2Wins++;
+            matchupStats[matchKey].P2Wins++;
         }
 
         if (CompletedMatches % 1000 == 0 || CompletedMatches >= maxMatches)
@@ -170,7 +196,8 @@ public class AIAIBattleManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("【テスト完了】10万回のAI対戦が終了しました。");
+            Debug.Log("【テスト完了】AI対戦が終了しました。");
+            PrintDetailedStatistics();
             Time.timeScale = 1f; 
         }
     }
@@ -179,5 +206,91 @@ public class AIAIBattleManager : MonoBehaviour
     {
         yield return null;
         StartNewMatch();
+    }
+
+    public class DeckStat
+    {
+        public int MatchesCount;
+        public int Wins;
+    }
+    private void PrintDetailedStatistics()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        sb.AppendLine("========== 詳細統計レポート ==========");
+
+        sb.AppendLine("");
+
+        sb.AppendLine("========== 各デッキの総合勝率 ==========");
+        
+        Dictionary<int, DeckStat> ai1DeckStats = new Dictionary<int, DeckStat>();
+        Dictionary<int, DeckStat> ai2DeckStats = new Dictionary<int, DeckStat>();
+        foreach (var stat in matchupStats)
+        {
+            int p1Deck = stat.Key.Item1;
+            int p2Deck = stat.Key.Item2;
+            int totalMatches = stat.Value.MatchesCount;
+            int p1Wins = stat.Value.P1Wins;
+            int p2Wins = stat.Value.P2Wins;
+
+            // AI1のデッキ集計
+            if (!ai1DeckStats.ContainsKey(p1Deck))
+            {
+                ai1DeckStats[p1Deck] = new DeckStat();
+            }
+            ai1DeckStats[p1Deck].MatchesCount += totalMatches;
+            ai1DeckStats[p1Deck].Wins += p1Wins;
+
+            // AI2のデッキ集計
+            if (!ai2DeckStats.ContainsKey(p2Deck))
+            {
+                ai2DeckStats[p2Deck] = new DeckStat();
+            }
+            ai2DeckStats[p2Deck].MatchesCount += totalMatches;
+            ai2DeckStats[p2Deck].Wins += p2Wins;
+        }
+
+        sb.AppendLine("--- AI 1 (1P側) のデッキ別成績 ---");
+        foreach (var stat in ai1DeckStats)
+        {
+            float winRate = (float)stat.Value.Wins / stat.Value.MatchesCount * 100f;
+            sb.AppendLine($"デッキID {stat.Key}: 勝率 {winRate:F2}% ({stat.Value.MatchesCount}戦 {stat.Value.Wins}勝)");
+        }
+
+        sb.AppendLine("");
+
+        sb.AppendLine("--- AI 2 (2P側) のデッキ別成績 ---");
+        foreach (var stat in ai2DeckStats)
+        {
+            float winRate = (float)stat.Value.Wins / stat.Value.MatchesCount * 100f;
+            sb.AppendLine($"デッキID {stat.Key}: 勝率 {winRate:F2}% ({stat.Value.MatchesCount}戦 {stat.Value.Wins}勝)");
+        }
+
+        sb.AppendLine("");
+
+        sb.AppendLine("========== デッキ組み合わせ別の詳細成績 ==========");
+        foreach (var stat in matchupStats)
+        {
+            int p1Deck = stat.Key.Item1;
+            int p2Deck = stat.Key.Item2;
+            int totalMatches = stat.Value.MatchesCount;
+            int p1WinCount = stat.Value.P1Wins;
+            int p2WinCount = stat.Value.P2Wins;
+
+            float p1WinRate = (float)p1WinCount / totalMatches * 100f;
+            float p2WinRate = (float)p2WinCount / totalMatches * 100f;
+
+            sb.AppendLine($"【AI1: デッキ{p1Deck}】 vs 【AI2: デッキ{p2Deck}】\n" +
+                    $"対戦数: {totalMatches}戦\n" +
+                    $"AI1の勝率: {p1WinRate:F2}% ({p1WinCount}勝)\n" +
+                    $"AI2の勝率: {p2WinRate:F2}% ({p2WinCount}勝)");
+            sb.AppendLine("");
+        }
+
+        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string fileName = $"AIBattleReport_{timestamp}.txt";
+        string filePath = Application.dataPath + "/Script/AIRanking/BattleData/" + fileName;
+        File.WriteAllText(filePath, sb.ToString());
+        Debug.Log($"【テスト完了】レポートをテキストファイルに出力しました。\n保存先: {filePath}");
     }
 }
