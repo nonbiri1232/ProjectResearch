@@ -12,6 +12,23 @@ public abstract class BattleManager : NetworkBehaviour
     public PhaseState CurrentPhase => gm != null ? gm.currentPhase : PhaseState.Start;
     public bool IsFinished => gm != null && gm.currentState == GameState.Finished;
 
+    protected bool isPresenting;
+
+    public bool CanAttackTarget(CardData attackerData, CardData? targetData = null)
+    {
+        if (!CanAct() || CurrentPhase != PhaseState.Main || remotePlayer == null) return false;
+        Card attacker = localPlayer.field.FirstOrDefault(c => c.uniqueId == attackerData.uniqueId);
+        if (attacker == null || attacker.Type != Card.CardType.Object || !attacker.isCanAttack ||
+            (attacker.isFirstTurn && !attacker.isImmediate) || attacker.isAttacked >= attacker.attackTimes)
+            return false;
+
+        var objects = remotePlayer.field.Where(c => c.Type == Card.CardType.Object).ToList();
+        if (!targetData.HasValue) return objects.Count == 0 && !attacker.isFirstTurn;
+        Card target = objects.FirstOrDefault(c => c.uniqueId == targetData.Value.uniqueId);
+        return target != null && !target.isEncrypted &&
+               (!objects.Any(c => c.isProxy) || target.isProxy);
+    }
+
     public int RequiresTargetCount(CardData cardData)
     {
         if (localPlayer == null) return 0;
@@ -34,7 +51,7 @@ public abstract class BattleManager : NetworkBehaviour
     /// </summary>
     public bool CanAct()
     {
-        return gm != null && 
+        return !isPresenting && localPlayer != null && gm != null &&
                gm.currentState == GameState.WaitingForInput && 
                gm.turn == localPlayer;
     }

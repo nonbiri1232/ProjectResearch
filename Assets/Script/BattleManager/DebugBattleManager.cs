@@ -22,6 +22,7 @@ public class DebugBattleManager : BattleManager
     [SerializeField] private CardLayoutManager p2FieldLayout;
     [SerializeField] private CardLayoutManager p2GarbageLayout;
     [SerializeField] private CardLayoutManager p2DeckLayout;
+    [SerializeField] private Transform enemyAttackTarget;
     private float enemyTurnTimer = 0f;
 
     private void Start()
@@ -31,7 +32,7 @@ public class DebugBattleManager : BattleManager
 
     private void Update()
     {
-        if (gm == null) return;
+        if (gm == null || isPresenting) return;
 
         // 相手のターンで入力待ち状態になったら、カウントを進める
         if (gm.turn == remotePlayer && gm.currentState == GameState.WaitingForInput)
@@ -58,6 +59,7 @@ public class DebugBattleManager : BattleManager
 
         // 3. 自分のターンに戻り、自分が新しくドローした分のカードを画面に生成
         SyncHandVisuals(localPlayer, p1HandLayout);
+        SyncBattleVisuals();
         
         uiManager.UpdateUI(gm, localPlayer, remotePlayer);
         Debug.Log("【Debug】自分のターンが開始されました！");
@@ -207,42 +209,92 @@ public class DebugBattleManager : BattleManager
     // ==========================================
     public override void SubmitPlay(CardData sourceData, bool addCost, List<CardData> targetDatas = null)
     {
+        if (!CanAct()) { p1HandLayout.RefreshCard(); return; }
         Card source = localPlayer.hand.FirstOrDefault(c => c.uniqueId == sourceData.uniqueId);
-        if (source == null) return;
-
-        // 正規のルール判定を通す
-        PlayerAction action = new PlayerAction(ActionType.Play, source);
-        action.isAddCost = addCost;
-        bool isSuccess = gm.ExecuteAction(localPlayer, remotePlayer, action);
-
-        if (isSuccess)
+        if (source == null) { p1HandLayout.RefreshCard(); return; }
+        List<Card> targets = null;
+        if (targetDatas != null)
         {
-            GameObject cardObj = p1HandLayout.FindCardObject(sourceData);
-            if (cardObj != null)
+            var available = localPlayer.hand.Concat(localPlayer.field).Concat(remotePlayer.field);
+            targets = new List<Card>();
+            foreach (CardData data in targetDatas)
             {
-                p1FieldLayout.ReceiveCard(p1HandLayout, sourceData, cardObj);
-                CardView view = cardObj.GetComponent<CardView>();
-                view.IsHandCard = false;
-                view.IsFieldCard = true;
-                view.Setup(CreateCardData(source));
+                Card target = available.FirstOrDefault(c => c.uniqueId == data.uniqueId);
+                if (target == null) { p1HandLayout.RefreshCard(); return; }
+                targets.Add(target);
             }
-            uiManager.UpdateUI(gm, localPlayer, remotePlayer);
         }
-        else
+        var action = new PlayerAction(ActionType.Play, source) { isAddCost = addCost, targetCard = targets };
+        if (!gm.ExecuteAction(localPlayer, remotePlayer, action))
         {
-            Debug.LogWarning($"【Debug】プレイ失敗（コスト不足など）: {source.GetType().Name}");
-            // 失敗した場合は手札の定位置にスッと戻る
             p1HandLayout.RefreshCard();
+            return;
+        }
+        // The manager owns the command; layouts own movement and effects.
+        SyncBattleVisuals();
+    }
+
+    public override void SubmitAttack(CardData attackerData, CardData? targetData = null)
+    {
+        if (!CanAttackTarget(attackerData, targetData)) return;
+        Card attacker = localPlayer.field.First(c => c.uniqueId == attackerData.uniqueId);
+        Card target = targetData.HasValue
+            ? remotePlayer.field.First(c => c.uniqueId == targetData.Value.uniqueId) : null;
+        GameObject targetObj = targetData.HasValue ? p2FieldLayout.FindCardObject(targetData.Value) : null;
+        Vector3 position = targetObj != null ? targetObj.transform.position :
+            (enemyAttackTarget != null ? enemyAttackTarget.position : p2FieldLayout.CenterPosition);
+        var action = target == null ? new PlayerAction(ActionType.Attack, attacker) :
+            new PlayerAction(ActionType.Attack, attacker, new List<Card> { target });
+        if (!gm.ExecuteAction(localPlayer, remotePlayer, action)) return;
+        isPresenting = true;
+        p1FieldLayout.PlayAttack(attackerData, position, () =>
+        {
+            isPresenting = false;
+            SyncBattleVisuals();
+        });
+    }
+
+    private void SyncBattleVisuals()
+    {
+        SyncPlayerVisuals(localPlayer, p1DeckLayout, p1HandLayout, p1FieldLayout, p1GarbageLayout);
+        SyncPlayerVisuals(remotePlayer, p2DeckLayout, p2HandLayout, p2FieldLayout, p2GarbageLayout);
+        uiManager.UpdateUI(gm, localPlayer, remotePlayer);
+    }
+
+    private void SyncPlayerVisuals(Player player, CardLayoutManager deck, CardLayoutManager hand,
+        CardLayoutManager field, CardLayoutManager garbage)
+    {
+        var layouts = new[] { deck, hand, field, garbage };
+        SyncZone(player, player.deck, deck, layouts);
+        SyncZone(player, player.hand, hand, layouts);
+        SyncZone(player, player.field, field, layouts);
+        if (gm.currentScope != null && gm.currentScope.player == player)
+            SyncZone(player, new List<Card> { gm.currentScope }, field, layouts);
+        SyncZone(player, player.garbage, garbage, layouts);
+    }
+
+    private void SyncZone(Player owner, List<Card> zone, CardLayoutManager destination,
+        CardLayoutManager[] layouts)
+    {
+        if (destination == null) return;
+        foreach (Card card in zone)
+        {
+            CardData data = CreateCardData(card);
+            if (destination.FindCardObject(data) == null)
+            {
+                CardLayoutManager source = layouts.FirstOrDefault(l => l != null && l.FindCardObject(data) != null);
+                if (source != null) destination.ReceiveCard(source, data, source.FindCardObject(data));
+                else destination.CreateCard(data);
+            }
+            destination.UpdateCard(data, owner == localPlayer, GetAbilityText(card));
         }
     }
 
-    public override void SubmitAttack(CardData attackerData, CardData? targetData = null) { }
     public override void SubmitEndTurn()
     {
-        PlayerAction action = new PlayerAction();
-        action.type = ActionType.End;
-
-        gm.ExecuteAction(localPlayer,remotePlayer,action);
+        if (!CanAct()) return;
+        if (gm.ExecuteAction(localPlayer, remotePlayer, new PlayerAction(ActionType.End)))
+            SyncBattleVisuals();
     }
     public override void SubmitSelfGarbage(List<CardData> selectedCardsData) { }
 
@@ -256,13 +308,6 @@ public class DebugBattleManager : BattleManager
 
     private CardData CreateCardData(Card c)
     {
-        return new CardData {
-            id = Card.GetCardId(c),
-            uniqueId = c.uniqueId,
-            cost = c.Cost,
-            atk = c.Attack,
-            hp = c.Hp,
-            canAttackNow = true
-        };
+        return Card.PackingCard(c);
     }
 }

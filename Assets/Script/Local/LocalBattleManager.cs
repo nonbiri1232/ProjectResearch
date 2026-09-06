@@ -321,7 +321,8 @@ public class LocalBattleManager:NetworkBehaviour
                 cost = cards[i].Cost,
                 atk = cards[i].Attack,
                 hp = cards[i].Hp,
-                canAttackNow = CanAttackNow(cards[i])
+                canAttackNow = CanAttackNow(cards[i]),
+                isProxy = cards[i].isProxy
             };
         }
         return data;   

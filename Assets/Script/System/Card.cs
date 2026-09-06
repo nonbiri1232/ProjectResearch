@@ -364,6 +364,7 @@ public class Card
         c.Hp = card.hp;
         c.Cost = card.cost;
         c.isCanAttack = card.canAttackNow;
+        c.isProxy = card.isProxy;
 
         return c;
     }

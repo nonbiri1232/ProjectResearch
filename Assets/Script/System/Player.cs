@@ -275,6 +275,7 @@ public class Player
             c.Hp = data.hp;
             c.Cost = data.cost;
             c.isCanAttack = data.canAttackNow;
+            c.isProxy = data.isProxy;
         }
         return deck;
     }
