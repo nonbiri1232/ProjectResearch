@@ -3719,7 +3719,7 @@ MonoBehaviour:
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
     hasUpgradedBrainParametersWithActionSpec: 1
-  m_Model: {fileID: 5022602860645237092, guid: b71f8e5a3d2c4f1096a7e83b45c21d90, type: 3}
+  m_Model: {fileID: 5022602860645237092, guid: 7e4a12d9c6f84b35a0e19726d5c8b403, type: 3}
   m_InferenceDevice: 0
   m_BehaviorType: 2
   m_BehaviorName: CardGame

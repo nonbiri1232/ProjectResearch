@@ -12,11 +12,11 @@ using System.IO;
 /// </summary>
 public class AIAIBattleManager : MonoBehaviour
 {
-    [Header("AI 1 (1P側) - どちらか片方をセット")]
+    [Header("AI 1 - どちらか片方をセット")]
     [SerializeField] private MlAgents ai1_New; 
     [SerializeField] private LegacyMlAgents ai1_Legacy; 
 
-    [Header("AI 2 (2P側) - どちらか片方をセット")]
+    [Header("AI 2 - どちらか片方をセット")]
     [SerializeField] private MlAgents ai2_New; 
     [SerializeField] private LegacyMlAgents ai2_Legacy; 
 
@@ -24,6 +24,19 @@ public class AIAIBattleManager : MonoBehaviour
     [Tooltip("自動で対戦を行う最大回数")]
     public int maxMatches = 100000;
     [SerializeField] private bool randomizeFirstPlayer = true;
+    [SerializeField, Min(1)] private int progressInterval = 100;
+    [SerializeField, Min(1)] private int maxSystemTurns = 200;
+    [SerializeField, Min(10)] private float stallTimeoutSeconds = 60f;
+    private float lastProgressTime;
+    private float nextStatusTime;
+    private int observedTick;
+    private int observedTurn;
+    private GameState observedState;
+    private bool runStarted;
+    private bool runFinished;
+    private string stopReason = "実行中";
+    private string reportPath;
+    public int Draws => CompletedMatches - AI1Wins - AI2Wins;
 
     [Header("AI Deck Pool")]
     [SerializeField] private AIDeckCatalog aiDeckCatalog;
@@ -64,10 +77,23 @@ public class AIAIBattleManager : MonoBehaviour
             return;
         }
 
+        if (maxMatches <= 0 || !ValidateModel(ai1_New != null ? (Agent)ai1_New : ai1_Legacy) ||
+            !ValidateModel(ai2_New != null ? (Agent)ai2_New : ai2_Legacy))
+        {
+            Debug.LogError("AI対戦: 対戦数またはModel設定が不正です。開始しません。");
+            enabled = false;
+            return;
+        }
+        reportPath = Path.Combine(Application.dataPath, "Script/AIRanking/BattleData",
+            $"AIBattleReport_{System.DateTime.Now:yyyyMMdd_HHmmss_fff}.txt");
+        runStarted = true;
+        nextStatusTime = Time.realtimeSinceStartup + 10f;
         // 超高速化: Unityのゲーム進行スピードをn倍にする
         Time.timeScale = 20f; 
 
-        Debug.Log($"【AI自動対戦】 描画なし・高速モードで {maxMatches}回のテストを開始します。");
+        Debug.Log(
+            $"【AI自動対戦】 {GetAgentName(ai1_New, ai1_Legacy)} vs " +
+            $"{GetAgentName(ai2_New, ai2_Legacy)} / {maxMatches}戦を開始します。");
         StartNewMatch();
     }
 
@@ -82,8 +108,66 @@ public class AIAIBattleManager : MonoBehaviour
         Time.timeScale = 1f; 
     }
 
+    private static bool ValidateModel(Agent agent)
+    {
+        var behavior = agent != null ? agent.GetComponent<BehaviorParameters>() : null;
+        return behavior != null && behavior.Model != null;
+    }
+
+    private void OnDisable()
+    {
+        if (!runStarted || runFinished) return;
+        stopReason = "途中停止（未完了の試合は集計対象外）";
+        PrintDetailedStatistics();
+        Time.timeScale = 1f;
+    }
+
+    private void Update()
+    {
+        if (!runStarted || runFinished || gm == null) return;
+        float now = Time.realtimeSinceStartup;
+        if (now >= nextStatusTime)
+        {
+            Debug.Log($"【AI対戦稼働】{CompletedMatches}/{maxMatches}戦完了、" +
+                $"AI1 {AI1Wins}勝 / AI2 {AI2Wins}勝 / 引分 {Draws}、" +
+                $"現在 {gm.systemTurn}ターン、状態={gm.currentState}、" +
+                $"phase={gm.currentPhase}、tick={gm.decisionTick}、" +
+                $"状態更新から {now - lastProgressTime:F0}秒");
+            nextStatusTime = now + 10f;
+        }
+        if (isStartingNextMatch) return;
+        if (gm.decisionTick != observedTick || gm.systemTurn != observedTurn ||
+            gm.currentState != observedState)
+        {
+            observedTick = gm.decisionTick;
+            observedTurn = gm.systemTurn;
+            observedState = gm.currentState;
+            lastProgressTime = now;
+        }
+        if (gm.currentState != GameState.Finished && gm.systemTurn >= maxSystemTurns)
+        {
+            Debug.LogWarning($"【AI対戦】{maxSystemTurns}ターン上限で引き分け。");
+            gm.FinishAsDraw();
+        }
+        else if (now - lastProgressTime >= stallTimeoutSeconds)
+        {
+            stopReason = $"進行停止: 第{CompletedMatches + 1}試合、デッキ " +
+                $"{currentp1DeckId} vs {currentp2DeckId}、turn={gm.systemTurn}、" +
+                $"state={gm.currentState}、phase={gm.currentPhase}、tick={gm.decisionTick}。未完了試合は集計対象外";
+            runFinished = true;
+            Debug.LogError(stopReason);
+            PrintDetailedStatistics();
+            if (ai1_New != null) ai1_New.enabled = false;
+            if (ai2_New != null) ai2_New.enabled = false;
+            if (ai1_Legacy != null) ai1_Legacy.enabled = false;
+            if (ai2_Legacy != null) ai2_Legacy.enabled = false;
+            Time.timeScale = 1f;
+        }
+    }
+
     public void StartNewMatch()
     {
+        if (runFinished) return;
         isStartingNextMatch = false;
 
         if (gm != null)
@@ -110,6 +194,10 @@ public class AIAIBattleManager : MonoBehaviour
         Player second = p1GoesFirst ? aiPlayer2 : aiPlayer1;
 
         gm = new GameManager(first, second);
+        observedTick = gm.decisionTick;
+        observedTurn = gm.systemTurn;
+        observedState = gm.currentState;
+        lastProgressTime = Time.realtimeSinceStartup;
 
         // 1P側の初期化（新旧どちらがセットされているかで分岐）
         if (ai1_New != null)
@@ -155,8 +243,19 @@ public class AIAIBattleManager : MonoBehaviour
         BehaviorParameters behavior = agent.GetComponent<BehaviorParameters>();
         if (behavior != null)
         {
-            behavior.BehaviorType = BehaviorType.Default; 
+            behavior.BehaviorType = BehaviorType.InferenceOnly;
         }
+    }
+
+    private static string GetAgentName(Agent newAgent, Agent legacyAgent)
+    {
+        Agent agent = newAgent != null ? newAgent : legacyAgent;
+        if (agent == null) return "未設定";
+
+        BehaviorParameters behavior = agent.GetComponent<BehaviorParameters>();
+        return behavior != null && behavior.Model != null
+            ? behavior.Model.name
+            : agent.GetType().Name;
     }
 
     private void HandleGameFinished(Player winner)
@@ -180,7 +279,7 @@ public class AIAIBattleManager : MonoBehaviour
             matchupStats[matchKey].P2Wins++;
         }
 
-        if (CompletedMatches % 1000 == 0 || CompletedMatches >= maxMatches)
+        if (CompletedMatches == 1 || CompletedMatches % Mathf.Max(1, progressInterval) == 0 || CompletedMatches >= maxMatches)
         {
             float winRate1 = (float)AI1Wins / CompletedMatches * 100f;
             float winRate2 = (float)AI2Wins / CompletedMatches * 100f;
@@ -188,6 +287,7 @@ public class AIAIBattleManager : MonoBehaviour
             Debug.Log($"【AI対戦進捗】 {CompletedMatches}戦 終了\n" +
                       $"AI 1 (勝率: {winRate1:F2}%) - {AI1Wins}勝\n" +
                       $"AI 2 (勝率: {winRate2:F2}%) - {AI2Wins}勝");
+            PrintDetailedStatistics();
         }
 
         if (CompletedMatches < maxMatches)
@@ -196,6 +296,8 @@ public class AIAIBattleManager : MonoBehaviour
         }
         else
         {
+            runFinished = true;
+            stopReason = "完了";
             Debug.Log("【テスト完了】AI対戦が終了しました。");
             PrintDetailedStatistics();
             Time.timeScale = 1f; 
@@ -218,7 +320,23 @@ public class AIAIBattleManager : MonoBehaviour
         StringBuilder sb = new StringBuilder();
 
         sb.AppendLine("========== 詳細統計レポート ==========");
-
+        sb.AppendLine($"状態: {stopReason}");
+        sb.AppendLine($"進捗: {CompletedMatches}/{maxMatches}戦、引き分け: {Draws}戦");
+        sb.AppendLine($"ターン上限: {maxSystemTurns}、進行停止検出: {stallTimeoutSeconds}秒");
+        string ai1Name = GetAgentName(ai1_New, ai1_Legacy);
+        string ai2Name = GetAgentName(ai2_New, ai2_Legacy);
+        float overallRate1 = CompletedMatches > 0
+            ? (float)AI1Wins / CompletedMatches * 100f
+            : 0f;
+        float overallRate2 = CompletedMatches > 0
+            ? (float)AI2Wins / CompletedMatches * 100f
+            : 0f;
+        sb.AppendLine($"AI1: {ai1Name}");
+        sb.AppendLine($"AI2: {ai2Name}");
+        sb.AppendLine($"先攻ランダム化: {(randomizeFirstPlayer ? "ON" : "OFF")}");
+        sb.AppendLine($"総合: AI1 {overallRate1:F2}% ({AI1Wins}勝) / " +
+                      $"AI2 {overallRate2:F2}% ({AI2Wins}勝) / " +
+                      $"全{CompletedMatches}戦");
         sb.AppendLine("");
 
         sb.AppendLine("========== 各デッキの総合勝率 ==========");
@@ -227,6 +345,7 @@ public class AIAIBattleManager : MonoBehaviour
         Dictionary<int, DeckStat> ai2DeckStats = new Dictionary<int, DeckStat>();
         foreach (var stat in matchupStats)
         {
+            if (stat.Value.MatchesCount == 0) continue;
             int p1Deck = stat.Key.Item1;
             int p2Deck = stat.Key.Item2;
             int totalMatches = stat.Value.MatchesCount;
@@ -250,7 +369,7 @@ public class AIAIBattleManager : MonoBehaviour
             ai2DeckStats[p2Deck].Wins += p2Wins;
         }
 
-        sb.AppendLine("--- AI 1 (1P側) のデッキ別成績 ---");
+        sb.AppendLine($"--- AI1 ({ai1Name}) のデッキ別成績 ---");
         foreach (var stat in ai1DeckStats)
         {
             float winRate = (float)stat.Value.Wins / stat.Value.MatchesCount * 100f;
@@ -259,7 +378,7 @@ public class AIAIBattleManager : MonoBehaviour
 
         sb.AppendLine("");
 
-        sb.AppendLine("--- AI 2 (2P側) のデッキ別成績 ---");
+        sb.AppendLine($"--- AI2 ({ai2Name}) のデッキ別成績 ---");
         foreach (var stat in ai2DeckStats)
         {
             float winRate = (float)stat.Value.Wins / stat.Value.MatchesCount * 100f;
@@ -271,6 +390,7 @@ public class AIAIBattleManager : MonoBehaviour
         sb.AppendLine("========== デッキ組み合わせ別の詳細成績 ==========");
         foreach (var stat in matchupStats)
         {
+            if (stat.Value.MatchesCount == 0) continue;
             int p1Deck = stat.Key.Item1;
             int p2Deck = stat.Key.Item2;
             int totalMatches = stat.Value.MatchesCount;
@@ -287,10 +407,15 @@ public class AIAIBattleManager : MonoBehaviour
             sb.AppendLine("");
         }
 
-        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string fileName = $"AIBattleReport_{timestamp}.txt";
-        string filePath = Application.dataPath + "/Script/AIRanking/BattleData/" + fileName;
-        File.WriteAllText(filePath, sb.ToString());
-        Debug.Log($"【テスト完了】レポートをテキストファイルに出力しました。\n保存先: {filePath}");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(reportPath));
+            File.WriteAllText(reportPath, sb.ToString());
+            Debug.Log($"【対戦レポート保存】{stopReason} / {CompletedMatches}戦\n保存先: {reportPath}");
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError($"対戦レポート保存失敗: {exception.Message}");
+        }
     }
 }

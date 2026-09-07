@@ -224,3 +224,31 @@ betaを0.01へ増加しconstantにしたことで、早期の方策固定を緩�
 ・報酬方式の効果を比較するときは、ステップ数やPPO設定を揃える。
 ・resultsフォルダは通常Git管理対象外のため、別PCへ共有する場合はモデルと
   このメモを明示的にコピーする。
+
+
+5. TeacherCurriculum_10M（予定）
+--------------------------------
+状態: 設定完了、未実行
+方式: 新方式 PPO、固定ルールベース教師 → Self-play
+目的: 学習序盤に教師AIを使うことで、純粋なSelf-playより早く基本戦術を獲得し、
+      最終的な対人性能が改善するか確認する。
+
+Phase 1:
+・Run ID: TeacherWarmup_2M
+・固定RuleBasedControllerを相手に2,000,000ステップ
+・設定: ml-agents-configs/teacher_curriculum_warmup_2m_config.yaml
+
+Phase 2:
+・Run ID: TeacherCurriculum_10M
+・TeacherWarmup_2Mから--initialize-fromで重みを引き継ぐ
+・Self-playを8,000,000ステップ
+・設定: ml-agents-configs/teacher_curriculum_selfplay_8m_config.yaml
+
+共通条件:
+・5デッキ、12 TrainingArea
+・勝利+1、敗北-1、メモリ進行報酬係数0.5
+・beta 0.01 constant、hidden_units 256、2層
+・学習経験の合計: 10,000,000ステップ
+
+実行手順:
+・ml-agents-configs/TEACHER_CURRICULUM.md
