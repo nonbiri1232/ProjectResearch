@@ -11,6 +11,8 @@ public enum TrainingOpponentMode
 
 public class TrainingArena : MonoBehaviour
 {
+    private const string OpponentModeParameter = "training_opponent_mode";
+
     [Header("対局させる2体のAgent")]
     [SerializeField] private MlAgents agentA;
     [SerializeField] private MlAgents agentB;
@@ -47,6 +49,7 @@ public class TrainingArena : MonoBehaviour
 
     private void Start()
     {
+        ApplyOpponentModeFromEnvironment();
         ConfigureOpponentController();
         if (!enabled) return;
 
@@ -55,6 +58,19 @@ public class TrainingArena : MonoBehaviour
             DeckManager.LoadDeck();
         }
         StartNewMatch();
+    }
+
+    private void ApplyOpponentModeFromEnvironment()
+    {
+        float configuredMode = Academy.Instance.EnvironmentParameters
+            .GetWithDefault(OpponentModeParameter, (float)opponentMode);
+        opponentMode = configuredMode < 0.5f
+            ? TrainingOpponentMode.RuleBased
+            : TrainingOpponentMode.SelfPlay;
+
+        Debug.Log(
+            $"【学習】Opponent Mode: {opponentMode} " +
+            $"({OpponentModeParameter}={configuredMode:F1})");
     }
 
     private void Update()
