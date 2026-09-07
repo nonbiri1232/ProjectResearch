@@ -131,6 +131,8 @@ public class PlayerInputManager : MonoBehaviour
 
     private void BeginDrag(GameObject cardObj)
     {
+        CardView candidate = cardObj.GetComponent<CardView>();
+        if (candidate == null || !candidate.IsMyCard) return;
         cardObj.transform.DOKill();
 
         draggingCard = cardObj;
@@ -199,7 +201,7 @@ public class PlayerInputManager : MonoBehaviour
 
     private void HandleDraggingField()
     {
-        DrawAttackCurve(draggingCard.transform.position, Input.mousePosition);
+        if (attackLine != null) DrawAttackCurve(draggingCard.transform.position, Input.mousePosition);
 
         if (Input.GetMouseButtonUp(0))
         {
@@ -211,7 +213,7 @@ public class PlayerInputManager : MonoBehaviour
                 if (hit.collider.CompareTag("Card"))
                 {
                     CardView targetView = hit.collider.GetComponent<CardView>();
-                    if (targetView != null && !targetView.IsMyCard)
+                    if (targetView != null && !targetView.IsMyCard && targetView.IsFieldCard)
                     {
                         // ★送信を有効化
                         battleManager.SubmitAttack(draggingCardView.CurrentData, targetView.CurrentData);
@@ -223,7 +225,10 @@ public class PlayerInputManager : MonoBehaviour
                     battleManager.SubmitAttack(draggingCardView.CurrentData, null);
                 }
             }
-            CancelDrag();
+            // Releasing input must not overwrite the attack tween started by BattleManager.
+            draggingCard = null;
+            draggingCardView = null;
+            currentState = InputState.Normal;
         }
     }
 

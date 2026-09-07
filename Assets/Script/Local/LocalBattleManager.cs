@@ -11,6 +11,7 @@ public struct CardData : INetworkSerializable
     public int atk;
     public int hp;
     public bool canAttackNow;
+    public bool isProxy;
 
     // 通信で送るためのパッキング処理
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -22,6 +23,7 @@ public struct CardData : INetworkSerializable
         serializer.SerializeValue(ref atk);
         serializer.SerializeValue(ref hp);
         serializer.SerializeValue(ref canAttackNow);
+        serializer.SerializeValue(ref isProxy);
     }
 }
 public class LocalBattleManager:NetworkBehaviour
@@ -319,7 +321,8 @@ public class LocalBattleManager:NetworkBehaviour
                 cost = cards[i].Cost,
                 atk = cards[i].Attack,
                 hp = cards[i].Hp,
-                canAttackNow = CanAttackNow(cards[i])
+                canAttackNow = CanAttackNow(cards[i]),
+                isProxy = cards[i].isProxy
             };
         }
         return data;   

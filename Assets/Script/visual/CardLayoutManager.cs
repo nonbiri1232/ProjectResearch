@@ -40,6 +40,52 @@ public class CardLayoutManager : MonoBehaviour
     private List<CardData> cards = new List<CardData>();
     private List<GameObject> fieldClone = new List<GameObject>();
 
+    // BattleManager calls this only after the action has passed the game rules.
+    public void PlayAttack(CardData attackerData, Vector3 targetPosition, System.Action onComplete)
+    {
+        GameObject attacker = FindCardObject(attackerData);
+        if (attacker == null) { onComplete?.Invoke(); return; }
+        Transform card = attacker.transform;
+        card.DOKill();
+        Vector3 origin = card.position;
+        Sequence sequence = DOTween.Sequence().SetTarget(card);
+        sequence.Append(card.DOMove(targetPosition, 0.2f).SetEase(Ease.InQuad));
+        sequence.AppendCallback(() => PlayImpact(targetPosition));
+        sequence.Append(card.DOMove(origin, 0.25f).SetEase(Ease.OutCubic));
+        bool completed = false;
+        System.Action finish = () =>
+        {
+            if (completed) return;
+            completed = true;
+            onComplete?.Invoke();
+        };
+        sequence.OnComplete(() => finish());
+        sequence.OnKill(() => finish());
+    }
+
+    public Vector3 CenterPosition => drawField != null ? drawField.position : transform.position;
+
+    private void PlayImpact(Vector3 position)
+    {
+        if (explosionEffectPrefab == null) return;
+        GameObject effect = Instantiate(explosionEffectPrefab, position, Quaternion.identity);
+        Destroy(effect, 3f);
+    }
+
+    public void UpdateCard(CardData data, bool isMyCard, string abilityText)
+    {
+        GameObject obj = FindCardObject(data);
+        if (obj == null) return;
+        int index = fieldClone.IndexOf(obj);
+        cards[index] = data;
+        CardView view = obj.GetComponent<CardView>();
+        view.Setup(data);
+        view.IsMyCard = isMyCard;
+        view.IsHandCard = fieldType == FieldType.Hand;
+        view.IsFieldCard = fieldType == FieldType.Field;
+        view.AbilityText = abilityText;
+    }
+
     private void Awake()
     {
         Initialize();
@@ -184,6 +230,7 @@ public class CardLayoutManager : MonoBehaviour
     public void ReceiveCard(CardLayoutManager fromManager, CardData data, GameObject obj)
     {
         FieldType sourceType = fromManager.fieldType;
+        obj.transform.SetParent(drawField, true);
         
         // 元のマネージャーの管理から外す
         fromManager.RemoveCard(data, obj);
@@ -243,6 +290,8 @@ public class CardLayoutManager : MonoBehaviour
                 }
                 break;
         }
+        if (fieldType == FieldType.Field)
+            seq.AppendCallback(() => PlayImpact(targetPosVec));
     }
 
     public void SpawnTokenCard(CardData data)
@@ -264,6 +313,7 @@ public class CardLayoutManager : MonoBehaviour
         Vector3 startPos = targetPosVec + new Vector3(0, 1.5f, 0);
         GameObject card = Instantiate(cardPrefab, startPos, Quaternion.identity);
         fieldClone.Add(card);
+        card.GetComponent<CardView>().Setup(data);
 
         card.transform.localScale = Vector3.zero; // 最初は見えない
 
