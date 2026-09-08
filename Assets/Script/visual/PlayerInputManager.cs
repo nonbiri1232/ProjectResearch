@@ -18,6 +18,8 @@ public class PlayerInputManager : MonoBehaviour
     public BattleUIManager uiManager;
     public CardLayoutManager p1HandLayout;
     public CardLayoutManager p1MariganLayout;
+    public CardLayoutManager p1FieldLayout;
+    public CardLayoutManager p2FieldLayout;
 
     [Header("UI Areas (Play)")]
     public RectTransform normalPlayArea; 
@@ -37,6 +39,8 @@ public class PlayerInputManager : MonoBehaviour
 
     private int requiredTargetCount;
     private List<CardData> selectedTargets = new List<CardData>();
+    private HashSet<int> validTargetIds = new HashSet<int>();
+    private CardLayoutManager activeTargetLayout;
     private bool isPlayWithAddCost = false;
 
     private void Start()
@@ -76,7 +80,7 @@ public class PlayerInputManager : MonoBehaviour
             if (hit.collider.CompareTag("Card"))
             {
                 CardView view = hit.collider.GetComponent<CardView>();
-                if (view != null && uiManager != null) uiManager.ShowPopUp(view.AbilityText); // ホバー表示
+                ShowPopup(view);
                 
                 // クリック時
                 if (Input.GetMouseButtonDown(0))
@@ -110,7 +114,7 @@ public class PlayerInputManager : MonoBehaviour
             if (hit.collider.CompareTag("Card"))
             {
                 CardView view = hit.collider.GetComponent<CardView>();
-                if (view != null && uiManager != null) uiManager.ShowPopUp(view.AbilityText); 
+                ShowPopup(view);
 
                 if (Input.GetMouseButtonDown(0) && battleManager.CanAct()) // ★CanAct()チェックを追加
                 {
@@ -240,7 +244,9 @@ public class PlayerInputManager : MonoBehaviour
             if (Physics.Raycast(ray, out RaycastHit hit) && hit.collider.CompareTag("Card"))
             {
                 CardView targetView = hit.collider.GetComponent<CardView>();
-                if (targetView != null)
+                if (targetView != null && activeTargetLayout != null &&
+                    validTargetIds.Contains(targetView.CurrentData.uniqueId) &&
+                    activeTargetLayout.FindCardObject(targetView.CurrentData) != null)
                 {
                     if (selectedTargets.Contains(targetView.CurrentData))
                     {
@@ -290,12 +296,28 @@ public class PlayerInputManager : MonoBehaviour
 
         if (targetCount > 0)
         {
+            if (!battleManager.TryGetPlayTargets(draggingCardView.CurrentData,
+                out where targetArea, out List<int> targetIds))
+            {
+                Debug.LogWarning("このカードで選択できる対象がありません。");
+                CancelDrag();
+                return;
+            }
+
+            activeTargetLayout = GetTargetLayout(targetArea);
+            if (activeTargetLayout == null)
+            {
+                Debug.LogError($"対象領域 {targetArea} のCardLayoutManagerが設定されていません。");
+                CancelDrag();
+                return;
+            }
+
             requiredTargetCount = targetCount;
             selectedTargets.Clear();
+            validTargetIds = new HashSet<int>(targetIds);
             currentState = InputState.SelectingTarget;
-            
-            // ★ここではデバッグ用に一時的にカードを見えなくする
-            draggingCard.SetActive(false); 
+            draggingCard.SetActive(false);
+            activeTargetLayout.BeginSelectionMode(targetIds);
         }
         else
         {
@@ -309,12 +331,11 @@ public class PlayerInputManager : MonoBehaviour
 
     private void ConfirmPlayWithTargets()
     {
-        // ★ターゲット付きでプレイ送信
-        battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, selectedTargets);
-
-        foreach (var data in selectedTargets) { /* Highlight解除処理 */ }
-
+        ClearTargetHighlights();
+        if (activeTargetLayout != null) activeTargetLayout.EndSelectionMode();
         draggingCard.SetActive(true);
+        battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, selectedTargets);
+        ResetTargetSelection();
         draggingCard = null;
         draggingCardView = null;
         currentState = InputState.Normal;
@@ -322,10 +343,48 @@ public class PlayerInputManager : MonoBehaviour
 
     private void CancelTargetSelection()
     {
-        p1HandLayout.EndSelectionMode();
-        foreach (var data in selectedTargets) { /* Highlight解除処理 */ }
+        ClearTargetHighlights();
+        if (activeTargetLayout != null) activeTargetLayout.EndSelectionMode();
         draggingCard.SetActive(true);
+        ResetTargetSelection();
         CancelDrag();
+    }
+
+    private CardLayoutManager GetTargetLayout(where targetArea)
+    {
+        switch (targetArea)
+        {
+            case where.hand: return p1HandLayout;
+            case where.selfField: return p1FieldLayout;
+            case where.enemyField: return p2FieldLayout;
+            default: return null;
+        }
+    }
+
+    private void ClearTargetHighlights()
+    {
+        if (activeTargetLayout == null) return;
+        foreach (CardData data in selectedTargets)
+        {
+            GameObject obj = activeTargetLayout.FindCardObject(data);
+            CardView view = obj != null ? obj.GetComponent<CardView>() : null;
+            if (view != null) view.SetHighlight(false);
+        }
+    }
+
+    private void ResetTargetSelection()
+    {
+        selectedTargets.Clear();
+        validTargetIds.Clear();
+        activeTargetLayout = null;
+        requiredTargetCount = 0;
+    }
+
+    private void ShowPopup(CardView view)
+    {
+        if (uiManager == null) return;
+        if (view != null && view.CanShowAbility) uiManager.ShowPopUp(view.AbilityText);
+        else uiManager.HidePopUp();
     }
 
     private void DrawAttackCurve(Vector3 startWorldPos, Vector3 mouseScreenPos)

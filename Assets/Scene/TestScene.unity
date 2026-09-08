@@ -2340,7 +2340,9 @@ MonoBehaviour:
   battleManager: {fileID: 714141049}
   uiManager: {fileID: 915508237}
   p1HandLayout: {fileID: 2098242965}
-  p1MariganLayout: {fileID: 0}
+  p1MariganLayout: {fileID: 176443337}
+  p1FieldLayout: {fileID: 399230775}
+  p2FieldLayout: {fileID: 370710048}
   normalPlayArea: {fileID: 212582035}
   addCostPlayArea: {fileID: 287441218}
   playAreaUI: {fileID: 1167071842}

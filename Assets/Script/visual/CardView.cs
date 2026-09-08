@@ -14,6 +14,7 @@ public class CardView : MonoBehaviour
     public bool IsFieldCard { get; set; } // 盤面にいるか
     public bool IsMyCard { get; set; } // 自分のカードか（敵のカードじゃないか）
     public string AbilityText { get; set; } // ホバーした時に表示する能力テキスト
+    public bool CanShowAbility { get; private set; }
 
     public CardData CurrentData { get; private set; }
 
@@ -25,14 +26,30 @@ public class CardView : MonoBehaviour
 
     public void UpdateVisuals()
     {
-        costText.text = CurrentData.cost.ToString();
-        atkText.text = CurrentData.atk.ToString();
-        hpText.text = CurrentData.hp.ToString();
+        if (costText != null) costText.text = CurrentData.cost.ToString();
+        if (atkText != null) atkText.text = CurrentData.atk.ToString();
+        if (hpText != null) hpText.text = CurrentData.hp.ToString();
+    }
+
+    public void SetPresentation(string abilityText, bool canShowAbility, Sprite sprite, bool isFaceDown)
+    {
+        CanShowAbility = canShowAbility && !isFaceDown && !string.IsNullOrWhiteSpace(abilityText);
+        AbilityText = CanShowAbility ? abilityText : string.Empty;
+        if (cardImage != null)
+        {
+            if (sprite != null) cardImage.sprite = sprite;
+            cardImage.gameObject.SetActive(!isFaceDown);
+        }
+        if (costText != null) costText.gameObject.SetActive(!isFaceDown);
+        if (atkText != null) atkText.gameObject.SetActive(!isFaceDown);
+        if (hpText != null) hpText.gameObject.SetActive(!isFaceDown);
     }
 
     public void SetHighlight(bool isSelected)
     {
-        Image bgImage = GetComponent<Image>(); // カードの背景画像
+        Image bgImage = cardImage;
+        if (bgImage == null) return;
+        bgImage.DOKill();
         if (isSelected)
         {
             // 水色に光らせて、無限にループして点滅（Yoyo）させる
@@ -41,7 +58,6 @@ public class CardView : MonoBehaviour
         else
         {
             // 点滅をキャンセルして元の白に戻す
-            bgImage.DOKill();
             bgImage.DOColor(Color.white, 0.2f);
         }
     }

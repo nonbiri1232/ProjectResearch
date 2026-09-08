@@ -102,8 +102,9 @@ public class DebugBattleManager : BattleManager
         List<Card> deck2 = new List<Card>();
         for (int i = 0; i < 40; i++)
         {
-            deck1.Add(Card.CreateCardInstance(1));
-            deck2.Add(Card.CreateCardInstance(2));
+            // 対象を必要としない1コストObjectで、プレイと攻撃を確認できるデバッグデッキにする。
+            deck1.Add(Card.CreateCardInstance(30));
+            deck2.Add(Card.CreateCardInstance(30));
         }
 
         localPlayer = new Player(deck1);
@@ -112,10 +113,14 @@ public class DebugBattleManager : BattleManager
         gm = new GameManager(localPlayer, remotePlayer);
 
         // 1. デッキのカードをすべて視覚的に生成する
+        p1DeckLayout.BeginBatchUpdate();
+        p2DeckLayout.BeginBatchUpdate();
         foreach (Card c in localPlayer.deck) p1DeckLayout.CreateCard(CreateCardData(c));
         foreach (Card c in localPlayer.hand) p1DeckLayout.CreateCard(CreateCardData(c)); // 引く前の手札も一旦デッキに生成
         foreach (Card c in remotePlayer.deck) p2DeckLayout.CreateCard(CreateCardData(c));
         foreach (Card c in remotePlayer.hand) p2DeckLayout.CreateCard(CreateCardData(c));
+        p1DeckLayout.EndBatchUpdate();
+        p2DeckLayout.EndBatchUpdate();
 
         // 2. デッキから初手を手札に引く（シームレスな移動）
         foreach (Card c in localPlayer.hand)
@@ -124,10 +129,7 @@ public class DebugBattleManager : BattleManager
             GameObject obj = p1DeckLayout.FindCardObject(data);
             p1HandLayout.ReceiveCard(p1DeckLayout, data, obj);
             
-            CardView view = obj.GetComponent<CardView>();
-            view.IsHandCard = true;
-            view.IsMyCard = true;
-            view.AbilityText = GetAbilityText(c);
+            p1HandLayout.UpdateCard(data, true, GetAbilityText(c), true, GetCardImage(c));
         }
 
         uiManager.UpdateUI(gm, localPlayer, remotePlayer);
@@ -143,6 +145,7 @@ public class DebugBattleManager : BattleManager
                 CardData data = CreateCardData(c);
                 GameObject obj = p1HandLayout.FindCardObject(data);
                 p1MariganLayout.ReceiveCard(p1HandLayout, data, obj);
+                p1MariganLayout.UpdateCard(data, true, GetAbilityText(c), true, GetCardImage(c));
             }
             
             inputManager.StartMariganSelection(); // マウスクラスをマリガン状態へ
@@ -191,16 +194,13 @@ public class DebugBattleManager : BattleManager
                     if (inDeck != null)
                     {
                         p1HandLayout.ReceiveCard(p1DeckLayout, data, inDeck);
-                        CardView view = inDeck.GetComponent<CardView>();
-                        view.IsHandCard = true;
-                        view.IsMyCard = true;
-                        view.AbilityText = GetAbilityText(c); // 新しいカードにも能力をセット
+                        p1HandLayout.UpdateCard(data, true, GetAbilityText(c), true, GetCardImage(c));
                     }
                 }
             }
             
             uiManager.HideMarigan();
-            uiManager.UpdateUI(gm, localPlayer, remotePlayer);
+            SyncBattleVisuals();
         }
     }
 
@@ -286,7 +286,15 @@ public class DebugBattleManager : BattleManager
                 if (source != null) destination.ReceiveCard(source, data, source.FindCardObject(data));
                 else destination.CreateCard(data);
             }
-            destination.UpdateCard(data, owner == localPlayer, GetAbilityText(card));
+            bool canShowAbility = !destination.IsFaceDown &&
+                ((owner == localPlayer && (destination == p1HandLayout || destination == p1FieldLayout)) ||
+                 (owner == remotePlayer && destination == p2FieldLayout));
+            destination.UpdateCard(
+                data,
+                owner == localPlayer,
+                canShowAbility ? GetAbilityText(card) : string.Empty,
+                canShowAbility,
+                destination.IsFaceDown ? null : GetCardImage(card));
         }
     }
 
@@ -300,10 +308,21 @@ public class DebugBattleManager : BattleManager
 
     private string GetAbilityText(Card c)
     {
-        if (cardDatabase == null) return "能力テキストなし";
-        string className = c.GetType().Name;
-        CardSetting setting = cardDatabase.cards.FirstOrDefault(s => s.className == className);
+        CardSetting setting = GetCardSetting(c);
         return setting != null ? setting.ability : "能力テキストなし";
+    }
+
+    private Sprite GetCardImage(Card c)
+    {
+        CardSetting setting = GetCardSetting(c);
+        return setting != null ? setting.cardImage : null;
+    }
+
+    private CardSetting GetCardSetting(Card c)
+    {
+        if (cardDatabase == null || c == null) return null;
+        string className = c.GetType().Name;
+        return cardDatabase.cards.FirstOrDefault(s => s.className == className);
     }
 
     private CardData CreateCardData(Card c)

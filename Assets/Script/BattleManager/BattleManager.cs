@@ -46,6 +46,28 @@ public abstract class BattleManager : NetworkBehaviour
         return 0;
     }
 
+    public bool TryGetPlayTargets(CardData cardData, out where targetArea, out List<int> targetUniqueIds)
+    {
+        targetArea = where.None;
+        targetUniqueIds = new List<int>();
+        if (localPlayer == null || remotePlayer == null) return false;
+
+        Card source = localPlayer.hand.FirstOrDefault(c => c.uniqueId == cardData.uniqueId);
+        if (source == null || source.select == null || !source.select.isSelectConstructor)
+            return false;
+
+        targetArea = source.select.whereTarget;
+        List<Card> candidates = source.select.numOfSelect == 1
+            ? LegalActionGenerator.GetValidPlayTargets(localPlayer, remotePlayer, source)
+            : LegalActionGenerator.GetPlayTargetPool(localPlayer, remotePlayer, source);
+        targetUniqueIds = candidates
+            .Where(c => c != null && c.uniqueId != source.uniqueId)
+            .Select(c => c.uniqueId)
+            .Distinct()
+            .ToList();
+        return targetUniqueIds.Count >= source.select.numOfSelect;
+    }
+
     /// <summary>
     /// 現在、自分が操作可能な状態（自分のターンで、入力待ち）かを確認する
     /// </summary>

@@ -39,6 +39,9 @@ public class CardLayoutManager : MonoBehaviour
 
     private List<CardData> cards = new List<CardData>();
     private List<GameObject> fieldClone = new List<GameObject>();
+    private bool isBatchUpdating;
+
+    public bool IsFaceDown => isFaceDown;
 
     // BattleManager calls this only after the action has passed the game rules.
     public void PlayAttack(CardData attackerData, Vector3 targetPosition, System.Action onComplete)
@@ -72,7 +75,8 @@ public class CardLayoutManager : MonoBehaviour
         Destroy(effect, 3f);
     }
 
-    public void UpdateCard(CardData data, bool isMyCard, string abilityText)
+    public void UpdateCard(CardData data, bool isMyCard, string abilityText,
+        bool canShowAbility, Sprite sprite)
     {
         GameObject obj = FindCardObject(data);
         if (obj == null) return;
@@ -83,7 +87,7 @@ public class CardLayoutManager : MonoBehaviour
         view.IsMyCard = isMyCard;
         view.IsHandCard = fieldType == FieldType.Hand;
         view.IsFieldCard = fieldType == FieldType.Field;
-        view.AbilityText = abilityText;
+        view.SetPresentation(abilityText, canShowAbility, sprite, isFaceDown);
     }
 
     private void Awake()
@@ -99,6 +103,7 @@ public class CardLayoutManager : MonoBehaviour
         if(view != null)
         {
             view.Setup(data);
+            view.SetPresentation(string.Empty, false, null, isFaceDown);
         }
 
         cards.Add(data);
@@ -106,10 +111,40 @@ public class CardLayoutManager : MonoBehaviour
 
         cardObj.transform.localScale = Vector3.zero;
 
-        CalculateLayout(cards.Count);
-        RefreshCard();
+        if (!isBatchUpdating)
+        {
+            CalculateLayout(cards.Count);
+            RefreshCard();
+        }
 
 
+    }
+
+    public void BeginBatchUpdate()
+    {
+        isBatchUpdating = true;
+    }
+
+    public void EndBatchUpdate(bool animate = false)
+    {
+        isBatchUpdating = false;
+        CalculateLayout(Mathf.Max(1, cards.Count));
+        if (animate) RefreshCard();
+        else ApplyLayoutImmediate();
+    }
+
+    private void ApplyLayoutImmediate()
+    {
+        Vector3 targetRot = isFaceDown ? new Vector3(0, 180, 0) : Vector3.zero;
+        Vector3 targetScale = Vector3.one * currentScale;
+        for (int i = 0; i < fieldClone.Count && i < cardPos.Length; i++)
+        {
+            Transform card = fieldClone[i].transform;
+            card.DOKill();
+            card.position = cardPos[i];
+            card.localScale = targetScale;
+            card.eulerAngles = targetRot;
+        }
     }
     public void Initialize()
     {
