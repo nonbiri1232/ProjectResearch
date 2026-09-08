@@ -34,6 +34,21 @@ public class DebugBattleManager : BattleManager
     {
         if (gm == null || isPresenting) return;
 
+        // 2ターン目以降のStartフェーズではセルフガベージの決定が必要。
+        // Debug画面には選択UIがないため、未選択（0枚）で確定してMainへ進める。
+        if (gm.currentPhase == PhaseState.Start && gm.systemTurn > 1 &&
+            gm.currentState == GameState.WaitingForInput)
+        {
+            Player activePlayer = gm.turn;
+            Player waitingPlayer = activePlayer == localPlayer ? remotePlayer : localPlayer;
+            if (gm.ExecuteAction(activePlayer, waitingPlayer,
+                new PlayerAction(ActionType.SelfGarbage, new List<Card>())))
+            {
+                SyncBattleVisuals();
+            }
+            return;
+        }
+
         // 相手のターンで入力待ち状態になったら、カウントを進める
         if (gm.turn == remotePlayer && gm.currentState == GameState.WaitingForInput)
         {
@@ -304,7 +319,27 @@ public class DebugBattleManager : BattleManager
         if (gm.ExecuteAction(localPlayer, remotePlayer, new PlayerAction(ActionType.End)))
             SyncBattleVisuals();
     }
-    public override void SubmitSelfGarbage(List<CardData> selectedCardsData) { }
+    public override void SubmitSelfGarbage(List<CardData> selectedCardsData)
+    {
+        if (!CanAct() || gm.currentPhase != PhaseState.Start || gm.systemTurn == 1) return;
+
+        List<Card> selectedCards = new List<Card>();
+        if (selectedCardsData != null)
+        {
+            foreach (CardData data in selectedCardsData)
+            {
+                Card card = localPlayer.field.FirstOrDefault(c => c.uniqueId == data.uniqueId);
+                if (card == null) return;
+                selectedCards.Add(card);
+            }
+        }
+
+        if (gm.ExecuteAction(localPlayer, remotePlayer,
+            new PlayerAction(ActionType.SelfGarbage, selectedCards)))
+        {
+            SyncBattleVisuals();
+        }
+    }
 
     private string GetAbilityText(Card c)
     {
