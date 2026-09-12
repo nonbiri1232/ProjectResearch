@@ -18,6 +18,11 @@ public class CardView : MonoBehaviour
 
     public CardData CurrentData { get; private set; }
 
+    public void SetImage(Sprite image)
+    {
+        cardImage.sprite = image;
+        UpdateVisuals();
+    }
     public void Setup(CardData data)
     {
         CurrentData = data;
@@ -26,9 +31,18 @@ public class CardView : MonoBehaviour
 
     public void UpdateVisuals()
     {
-        if (costText != null) costText.text = CurrentData.cost.ToString();
-        if (atkText != null) atkText.text = CurrentData.atk.ToString();
-        if (hpText != null) hpText.text = CurrentData.hp.ToString();
+        if (costText != null) {
+            costText.text = CurrentData.cost.ToString();
+            costText.ForceMeshUpdate();
+        }
+        if (atkText != null) {
+            atkText.text = CurrentData.atk.ToString();
+            atkText.ForceMeshUpdate();
+        }
+        if (hpText != null) {
+            hpText.text = CurrentData.hp.ToString();
+            hpText.ForceMeshUpdate();
+        }
     }
 
     public void SetPresentation(string abilityText, bool canShowAbility, Sprite sprite, bool isFaceDown)
@@ -40,9 +54,11 @@ public class CardView : MonoBehaviour
             if (sprite != null) cardImage.sprite = sprite;
             cardImage.gameObject.SetActive(!isFaceDown);
         }
-        if (costText != null) costText.gameObject.SetActive(!isFaceDown);
-        if (atkText != null) atkText.gameObject.SetActive(!isFaceDown);
-        if (hpText != null) hpText.gameObject.SetActive(!isFaceDown);
+        if (costText != null) costText.transform.parent.gameObject.SetActive(!isFaceDown);
+        if (atkText != null) atkText.transform.parent.gameObject.SetActive(!isFaceDown);
+        if (hpText != null) hpText.transform.parent.gameObject.SetActive(!isFaceDown);
+
+        UpdateVisuals();
     }
 
     public void SetHighlight(bool isSelected)

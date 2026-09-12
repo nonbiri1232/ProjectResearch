@@ -229,7 +229,6 @@ public class PlayerInputManager : MonoBehaviour
                     battleManager.SubmitAttack(draggingCardView.CurrentData, null);
                 }
             }
-            // Releasing input must not overwrite the attack tween started by BattleManager.
             draggingCard = null;
             draggingCardView = null;
             currentState = InputState.Normal;
@@ -300,7 +299,10 @@ public class PlayerInputManager : MonoBehaviour
                 out where targetArea, out List<int> targetIds))
             {
                 Debug.LogWarning("このカードで選択できる対象がありません。");
-                CancelDrag();
+                battleManager.SubmitPlay(draggingCardView.CurrentData, isPlayWithAddCost, null);
+                draggingCard = null;
+                draggingCardView = null;
+                currentState = InputState.Normal;
                 return;
             }
 

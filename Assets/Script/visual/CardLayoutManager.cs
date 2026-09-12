@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using DG.Tweening;
+using UnityEngine.UI;
 
 public enum FieldType
 {
@@ -95,6 +96,31 @@ public class CardLayoutManager : MonoBehaviour
         Initialize();
     }
 
+    public void CreateCard(CardData data,Sprite image)
+    {
+        GameObject cardObj = Instantiate(cardPrefab, leftTop, Quaternion.identity,drawField);
+
+        CardView view = cardObj.GetComponent<CardView>();
+        if(view != null)
+        {
+            view.SetImage(image);
+            view.Setup(data);
+            view.SetPresentation(string.Empty, false, null, isFaceDown);
+        }
+
+        cards.Add(data);
+        fieldClone.Add(cardObj);
+
+        cardObj.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
+
+        if (!isBatchUpdating)
+        {
+            CalculateLayout(cards.Count);
+            RefreshCard();
+        }
+
+
+    }
     public void CreateCard(CardData data)
     {
         GameObject cardObj = Instantiate(cardPrefab, leftTop, Quaternion.identity,drawField);
@@ -109,7 +135,7 @@ public class CardLayoutManager : MonoBehaviour
         cards.Add(data);
         fieldClone.Add(cardObj);
 
-        cardObj.transform.localScale = Vector3.zero;
+        cardObj.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
 
         if (!isBatchUpdating)
         {
@@ -117,7 +143,7 @@ public class CardLayoutManager : MonoBehaviour
             RefreshCard();
         }
 
-
+        
     }
 
     public void BeginBatchUpdate()

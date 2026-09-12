@@ -814,7 +814,6 @@ GameObject:
   - component: {fileID: 176443333}
   - component: {fileID: 176443336}
   - component: {fileID: 176443335}
-  - component: {fileID: 176443334}
   - component: {fileID: 176443337}
   m_Layer: 5
   m_Name: Player1Hand
@@ -842,32 +841,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: -298.11, y: -725.92}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &176443334
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 176443332}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 4
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &176443335
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1512,7 +1485,6 @@ GameObject:
   - component: {fileID: 361286420}
   - component: {fileID: 361286424}
   - component: {fileID: 361286423}
-  - component: {fileID: 361286422}
   - component: {fileID: 361286421}
   m_Layer: 5
   m_Name: Hand
@@ -1557,32 +1529,6 @@ MonoBehaviour:
   fieldType: 1
   isFaceDown: 1
   explosionEffectPrefab: {fileID: 4794043405585894037, guid: 37138c0c33167b04fa1fb90b7f5a794f, type: 3}
---- !u!114 &361286422
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 361286419}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &361286423
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1632,7 +1578,6 @@ GameObject:
   - component: {fileID: 370710047}
   - component: {fileID: 370710051}
   - component: {fileID: 370710050}
-  - component: {fileID: 370710049}
   - component: {fileID: 370710048}
   m_Layer: 5
   m_Name: Field
@@ -1677,32 +1622,6 @@ MonoBehaviour:
   fieldType: 2
   isFaceDown: 0
   explosionEffectPrefab: {fileID: 4794043405585894037, guid: 37138c0c33167b04fa1fb90b7f5a794f, type: 3}
---- !u!114 &370710049
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 370710046}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &370710050
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1752,7 +1671,6 @@ GameObject:
   - component: {fileID: 399230771}
   - component: {fileID: 399230774}
   - component: {fileID: 399230773}
-  - component: {fileID: 399230772}
   - component: {fileID: 399230775}
   m_Layer: 5
   m_Name: Field
@@ -1780,32 +1698,6 @@ RectTransform:
   m_AnchoredPosition: {x: -98.37866, y: -672.01434}
   m_SizeDelta: {x: 1619.7445, y: 316.804}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &399230772
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 399230770}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &399230773
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2459,7 +2351,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &649695515
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2736,6 +2628,7 @@ MonoBehaviour:
   p2FieldLayout: {fileID: 370710048}
   p2GarbageLayout: {fileID: 1108841357}
   p2DeckLayout: {fileID: 945717131}
+  enemyAttackTarget: {fileID: 1289504395}
 --- !u!1 &714473680
 GameObject:
   m_ObjectHideFlags: 0
@@ -2804,8 +2697,8 @@ Canvas:
   m_GameObject: {fileID: 714473680}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
-  m_Camera: {fileID: 0}
+  m_RenderMode: 1
+  m_Camera: {fileID: 874242814}
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
@@ -2817,7 +2710,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 2
   m_TargetDisplay: 0
 --- !u!224 &714473684
 RectTransform:
@@ -3847,7 +3740,6 @@ GameObject:
   - component: {fileID: 945717130}
   - component: {fileID: 945717134}
   - component: {fileID: 945717133}
-  - component: {fileID: 945717132}
   - component: {fileID: 945717131}
   m_Layer: 5
   m_Name: Deck
@@ -3892,32 +3784,6 @@ MonoBehaviour:
   fieldType: 0
   isFaceDown: 1
   explosionEffectPrefab: {fileID: 4794043405585894037, guid: 37138c0c33167b04fa1fb90b7f5a794f, type: 3}
---- !u!114 &945717132
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 945717129}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &945717133
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4121,7 +3987,6 @@ GameObject:
   - component: {fileID: 1108841356}
   - component: {fileID: 1108841360}
   - component: {fileID: 1108841359}
-  - component: {fileID: 1108841358}
   - component: {fileID: 1108841357}
   m_Layer: 5
   m_Name: Garbage
@@ -4166,32 +4031,6 @@ MonoBehaviour:
   fieldType: 3
   isFaceDown: 1
   explosionEffectPrefab: {fileID: 4794043405585894037, guid: 37138c0c33167b04fa1fb90b7f5a794f, type: 3}
---- !u!114 &1108841358
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1108841355}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &1108841359
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4831,9 +4670,10 @@ GameObject:
   - component: {fileID: 1289504395}
   - component: {fileID: 1289504397}
   - component: {fileID: 1289504396}
+  - component: {fileID: 1289504398}
   m_Layer: 5
   m_Name: MemoryImage
-  m_TagString: Untagged
+  m_TagString: EnemyPlayer
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -4899,6 +4739,27 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1289504394}
   m_CullTransparentMesh: 1
+--- !u!65 &1289504398
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289504394}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 394.36328, y: 144.60709, z: 64.23932}
+  m_Center: {x: 0.4144287, y: -0.8004303, z: -27.11966}
 --- !u!1 &1377467365
 GameObject:
   m_ObjectHideFlags: 0
@@ -5063,7 +4924,6 @@ GameObject:
   - component: {fileID: 1402328350}
   - component: {fileID: 1402328354}
   - component: {fileID: 1402328353}
-  - component: {fileID: 1402328352}
   - component: {fileID: 1402328351}
   m_Layer: 5
   m_Name: Garbage
@@ -5108,32 +4968,6 @@ MonoBehaviour:
   fieldType: 3
   isFaceDown: 1
   explosionEffectPrefab: {fileID: 4794043405585894037, guid: 37138c0c33167b04fa1fb90b7f5a794f, type: 3}
---- !u!114 &1402328352
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1402328349}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &1402328353
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5866,7 +5700,6 @@ GameObject:
   - component: {fileID: 1966162597}
   - component: {fileID: 1966162601}
   - component: {fileID: 1966162600}
-  - component: {fileID: 1966162599}
   - component: {fileID: 1966162598}
   m_Layer: 5
   m_Name: Deck
@@ -5911,32 +5744,6 @@ MonoBehaviour:
   fieldType: 0
   isFaceDown: 1
   explosionEffectPrefab: {fileID: 4794043405585894037, guid: 37138c0c33167b04fa1fb90b7f5a794f, type: 3}
---- !u!114 &1966162599
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1966162596}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &1966162600
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6362,7 +6169,6 @@ GameObject:
   - component: {fileID: 2098242961}
   - component: {fileID: 2098242964}
   - component: {fileID: 2098242963}
-  - component: {fileID: 2098242962}
   - component: {fileID: 2098242965}
   m_Layer: 5
   m_Name: Hand
@@ -6390,32 +6196,6 @@ RectTransform:
   m_AnchoredPosition: {x: -20.96, y: -923.6439}
   m_SizeDelta: {x: 1069.4199, y: 103.0421}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &2098242962
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2098242960}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
 --- !u!114 &2098242963
 MonoBehaviour:
   m_ObjectHideFlags: 0

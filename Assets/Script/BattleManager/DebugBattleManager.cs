@@ -23,6 +23,7 @@ public class DebugBattleManager : BattleManager
     [SerializeField] private CardLayoutManager p2GarbageLayout;
     [SerializeField] private CardLayoutManager p2DeckLayout;
     [SerializeField] private Transform enemyAttackTarget;
+    [SerializeField] private Sprite fallbackCardImage;
     private float enemyTurnTimer = 0f;
 
     private void Start()
@@ -64,15 +65,27 @@ public class DebugBattleManager : BattleManager
     }
     private void SimulateEnemyTurn()
     {
-        Debug.Log("【Debug】相手のターンを自動スキップします。");
+        Debug.Log("【Debug】相手のターンです。");
 
         // 1. 相手がドローした分のカードを画面上に生成（裏向き）
         SyncHandVisuals(remotePlayer, p2HandLayout);
+        
+        // 2.手持ちのカードにプレイできるものがあればプレイさせる
+        foreach(Card c in remotePlayer.hand)
+        {
+            if(remotePlayer.maxMemory - remotePlayer.fieldCost >= c.Cost && c.Cost <= remotePlayer.usableMemory - remotePlayer.usedMemory)
+            {
+                Debug.Log("カードをプレイしました。");
+                gm.ExecuteAction(remotePlayer, localPlayer, new PlayerAction(ActionType.Play,c));
+                SyncBattleVisuals();
+                break;
+            }
+        }
 
-        // 2. 相手が「ターン終了」を宣言したことにして、GameManagerの処理を進める
+        // 3. 相手が「ターン終了」を宣言したことにして、GameManagerの処理を進める
         gm.ExecuteAction(remotePlayer, localPlayer, new PlayerAction(ActionType.End));
 
-        // 3. 自分のターンに戻り、自分が新しくドローした分のカードを画面に生成
+        // 4. 自分のターンに戻り、自分が新しくドローした分のカードを画面に生成
         SyncHandVisuals(localPlayer, p1HandLayout);
         SyncBattleVisuals();
         
@@ -118,8 +131,8 @@ public class DebugBattleManager : BattleManager
         for (int i = 0; i < 40; i++)
         {
             // 対象を必要としない1コストObjectで、プレイと攻撃を確認できるデバッグデッキにする。
-            deck1.Add(Card.CreateCardInstance(30));
-            deck2.Add(Card.CreateCardInstance(30));
+            deck1.Add(Card.CreateCardInstance(1));
+            deck2.Add(Card.CreateCardInstance(1));
         }
 
         localPlayer = new Player(deck1);
@@ -130,10 +143,26 @@ public class DebugBattleManager : BattleManager
         // 1. デッキのカードをすべて視覚的に生成する
         p1DeckLayout.BeginBatchUpdate();
         p2DeckLayout.BeginBatchUpdate();
-        foreach (Card c in localPlayer.deck) p1DeckLayout.CreateCard(CreateCardData(c));
-        foreach (Card c in localPlayer.hand) p1DeckLayout.CreateCard(CreateCardData(c)); // 引く前の手札も一旦デッキに生成
-        foreach (Card c in remotePlayer.deck) p2DeckLayout.CreateCard(CreateCardData(c));
-        foreach (Card c in remotePlayer.hand) p2DeckLayout.CreateCard(CreateCardData(c));
+        foreach (Card c in localPlayer.deck){
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p1DeckLayout.CreateCard(CreateCardData(c),image);
+        }
+        foreach (Card c in localPlayer.hand){
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p1DeckLayout.CreateCard(CreateCardData(c),image);
+        } // 引く前の手札も一旦デッキに生成
+        foreach (Card c in remotePlayer.deck) {
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p2DeckLayout.CreateCard(CreateCardData(c),image);
+        }
+        foreach (Card c in remotePlayer.hand) {
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p2DeckLayout.CreateCard(CreateCardData(c),image);
+        }
         p1DeckLayout.EndBatchUpdate();
         p2DeckLayout.EndBatchUpdate();
 
@@ -350,7 +379,14 @@ public class DebugBattleManager : BattleManager
     private Sprite GetCardImage(Card c)
     {
         CardSetting setting = GetCardSetting(c);
-        return setting != null ? setting.cardImage : null;
+        Sprite sprite = setting != null ? setting.cardImage : null;
+        if (sprite == null)
+        {
+            Debug.LogWarning(setting != null
+                ? $"CardImage が未設定です: {setting.className}"
+                : $"CardSetting が見つかりませんでした: {c?.GetType().Name}");
+        }
+        return sprite != null ? sprite : fallbackCardImage;
     }
 
     private CardSetting GetCardSetting(Card c)
