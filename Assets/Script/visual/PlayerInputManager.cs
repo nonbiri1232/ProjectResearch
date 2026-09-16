@@ -385,7 +385,29 @@ public class PlayerInputManager : MonoBehaviour
     private void ShowPopup(CardView view)
     {
         if (uiManager == null) return;
-        if (view != null && view.CanShowAbility) uiManager.ShowPopUp(view.AbilityText);
+        bool canInspect = view != null &&
+            (view.IsMyCard
+                ? view.IsHandCard || view.IsFieldCard
+                : view.IsFieldCard);
+        if (!canInspect)
+        {
+            uiManager.HidePopUp();
+            return;
+        }
+
+        string abilityText = view.AbilityText;
+        if (string.IsNullOrWhiteSpace(abilityText) && uiManager.cardDatabase != null)
+        {
+            string className = Card.GetCardClassName(view.CurrentData.id);
+            foreach (CardSetting setting in uiManager.cardDatabase.cards)
+            {
+                if (setting.className != className) continue;
+                abilityText = setting.ability;
+                break;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(abilityText)) uiManager.ShowPopUp(abilityText);
         else uiManager.HidePopUp();
     }
 
