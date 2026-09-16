@@ -66,6 +66,9 @@ public class LocalBattleManager : BattleManager
 
     private void WireNewBattleView()
     {
+        if (cardDatabase == null && visualManager != null)
+            cardDatabase = visualManager.cardDatabase;
+
         if (inputManager == null)
             inputManager = FindAnyObjectByType<PlayerInputManager>();
         if (inputManager == null) return;
@@ -77,6 +80,9 @@ public class LocalBattleManager : BattleManager
         inputManager.p1HandLayout = p1HandLayout;
         inputManager.p1FieldLayout = p1FieldLayout;
         inputManager.p2FieldLayout = p2FieldLayout;
+
+        if (cardDatabase == null && inputManager.uiManager != null)
+            cardDatabase = inputManager.uiManager.cardDatabase;
     }
 
     public override void OnNetworkSpawn()
