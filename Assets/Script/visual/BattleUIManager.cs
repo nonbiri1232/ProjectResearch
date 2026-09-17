@@ -107,4 +107,37 @@ public class BattleUIManager : MonoBehaviour
     {
         if (cardPopupPanel != null) cardPopupPanel.SetActive(false);
     }
+
+    public void UpdateNetworkUI(bool myTurn, PhaseState phase, int[] self, int[] enemy)
+    {
+        systemText.text = (myTurn ? "あなたのターン" : "相手のターン") + $"\nフェーズ: {phase}";
+        selfDataText.text = $"Hand:{self[0]} Deck:{self[6]} Garbage:{self[1]}";
+        enemyDataText.text = $"Hand:{enemy[0]} Deck:{enemy[6]} Garbage:{enemy[1]}";
+        selfmaxMemory.text = self[2].ToString();
+        selffieldMemory.text = self[3].ToString();
+        selfusableMemory.text = self[4].ToString();
+        selfusedMemory.text = self[5].ToString();
+        enemymaxMemory.text = enemy[2].ToString();
+        enemyfieldMemory.text = enemy[3].ToString();
+        enemyusableMemory.text = enemy[4].ToString();
+        enemyusedMemory.text = enemy[5].ToString();
+    }
+
+    public Button CreateActionButton(string label, Transform parent, Vector2 anchor, UnityEngine.Events.UnityAction action)
+    {
+        Button button = Instantiate(endTurnButton, parent);
+        button.name = label;
+        button.onClick = new Button.ButtonClickedEvent();
+        button.onClick.AddListener(action);
+        button.interactable = true;
+        RectTransform rect = (RectTransform)button.transform;
+        rect.anchorMin = rect.anchorMax = anchor;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(240, 55);
+        TMP_Text text = button.GetComponentInChildren<TMP_Text>();
+        if (text != null) { text.text = label; text.fontSize = 22; }
+        button.gameObject.SetActive(true);
+        return button;
+    }
 }

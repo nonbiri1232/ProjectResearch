@@ -44,6 +44,54 @@ public class CardLayoutManager : MonoBehaviour
 
     public bool IsFaceDown => isFaceDown;
 
+    // Shared by local-network and AI battles, after successful rule execution.
+    public void PresentPlay(CardLayoutManager from, CardData data, bool isMyCard,
+        string ability, Sprite sprite)
+    {
+        GameObject obj = from != null ? from.FindCardObject(data) : null;
+        if (obj != null) ReceiveCard(from, data, obj);
+        else if (FindCardObject(data) == null) CreateCard(data, sprite);
+        UpdateCard(data, isMyCard, ability, true, sprite);
+    }
+
+    public void ClearCards()
+    {
+        foreach (GameObject obj in fieldClone)
+        {
+            if (obj == null) continue;
+            obj.transform.DOKill();
+            foreach (CardView view in obj.GetComponentsInChildren<CardView>())
+                view.SetHighlight(false);
+            obj.SetActive(false);
+            Destroy(obj);
+        }
+        fieldClone.Clear();
+        cards.Clear();
+        IsSelectionMode = false;
+    }
+
+    public void RetainCards(HashSet<int> liveIds)
+    {
+        bool removed = false;
+        for (int i = fieldClone.Count - 1; i >= 0; i--)
+        {
+            if (liveIds.Contains(cards[i].uniqueId)) continue;
+            GameObject obj = fieldClone[i];
+            obj.transform.DOKill();
+            obj.GetComponent<CardView>()?.SetHighlight(false);
+            obj.SetActive(false);
+            Destroy(obj);
+            fieldClone.RemoveAt(i);
+            cards.RemoveAt(i);
+            removed = true;
+        }
+        if (removed)
+        {
+            CalculateLayout(Mathf.Max(1, cards.Count));
+            RefreshCard();
+        }
+    }
+
     // BattleManager calls this only after the action has passed the game rules.
     public void PlayAttack(CardData attackerData, Vector3 targetPosition, System.Action onComplete)
     {
@@ -322,7 +370,7 @@ public class CardLayoutManager : MonoBehaviour
         Vector3 targetRot = isFaceDown ? new Vector3(0, 180, 0) : Vector3.zero;
         Vector3 targetScale = Vector3.one * currentScale;
 
-        Sequence seq = DOTween.Sequence();
+        Sequence seq = DOTween.Sequence().SetTarget(card.transform);
 
         switch (fieldType)
         {
@@ -378,7 +426,7 @@ public class CardLayoutManager : MonoBehaviour
 
         card.transform.localScale = Vector3.zero; // 最初は見えない
 
-        Sequence seq = DOTween.Sequence();
+        Sequence seq = DOTween.Sequence().SetTarget(card.transform);
         seq.Append(card.transform.DOScale(targetScale, 0.3f).SetEase(Ease.OutBack));
         seq.Join(card.transform.DOJump(targetPosVec, 1.0f, 1, 0.5f).SetEase(Ease.OutQuad));
         seq.Join(card.transform.DORotate(targetRot, 0.5f));

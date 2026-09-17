@@ -8,6 +8,7 @@ public enum InputState
     DraggingHand,   // 手札をドラッグ中（プレイ準備）
     DraggingField,  // 場のカードをドラッグ中（攻撃準備）
     SelectingTarget, // 対象を選択中
+    SelectingSelfGarbage,
     SelectingMarigan //マリガン選択中
 }
 
@@ -57,9 +58,62 @@ public class PlayerInputManager : MonoBehaviour
             case InputState.DraggingHand: HandleDraggingHand(); break;
             case InputState.DraggingField: HandleDraggingField(); break;
             case InputState.SelectingTarget: HandleSelectingTarget(); break;
+            case InputState.SelectingSelfGarbage: HandleSelectingSelfGarbage(); break;
             case InputState.SelectingMarigan: HandleSelectingMarigan(); break;
         }
     }
+    public void ResetSelection()
+    {
+        ClearTargetHighlights();
+        if (activeTargetLayout != null) activeTargetLayout.EndSelectionMode();
+        if (draggingCard != null) draggingCard.SetActive(true);
+        ResetTargetSelection();
+        selectedTargets.Clear();
+        currentState = InputState.Normal;
+        draggingCard = null;
+        draggingCardView = null;
+        if (attackLine != null) attackLine.enabled = false;
+        if (playAreaUI != null) playAreaUI.SetActive(false);
+        if (uiManager != null) uiManager.HidePopUp();
+    }
+
+    public void StartSelfGarbageSelection()
+    {
+        currentState = InputState.SelectingSelfGarbage;
+        selectedTargets.Clear();
+    }
+
+    public void ConfirmSelfGarbage()
+    {
+        if (currentState != InputState.SelectingSelfGarbage || !battleManager.CanAct()) return;
+        foreach (CardData data in selectedTargets)
+            p1FieldLayout.FindCardObject(data)?.GetComponent<CardView>()?.SetHighlight(false);
+        battleManager.SubmitSelfGarbage(new List<CardData>(selectedTargets));
+        selectedTargets.Clear();
+        currentState = InputState.Normal;
+    }
+
+    private void HandleSelectingSelfGarbage()
+    {
+        if (Camera.main == null) return;
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit)) { uiManager.HidePopUp(); return; }
+        CardView view = hit.collider.GetComponent<CardView>();
+        if (view == null || !view.IsMyCard || !view.IsFieldCard) return;
+        ShowPopup(view);
+        if (!Input.GetMouseButtonDown(0) || !battleManager.CanAct()) return;
+        if (selectedTargets.Exists(c => c.uniqueId == view.CurrentData.uniqueId))
+        {
+            selectedTargets.RemoveAll(c => c.uniqueId == view.CurrentData.uniqueId);
+            view.SetHighlight(false);
+        }
+        else
+        {
+            selectedTargets.Add(view.CurrentData);
+            view.SetHighlight(true);
+        }
+    }
+
     public void StartMariganSelection()
     {
         currentState = InputState.SelectingMarigan;
@@ -68,6 +122,8 @@ public class PlayerInputManager : MonoBehaviour
     public void ConfirmMarigan()
     {
         if (currentState != InputState.SelectingMarigan) return;
+        foreach (CardData data in selectedTargets)
+            p1MariganLayout.FindCardObject(data)?.GetComponent<CardView>()?.SetHighlight(false);
         battleManager.SubmitMarigan(selectedTargets);
         selectedTargets.Clear();
         currentState = InputState.Normal;
