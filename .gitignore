@@ -129,3 +129,6 @@ ml_env/
 **/run_logs/
 **/checkpoint.pt
 **/*.pt
+
+# Local copies of training archives and extracted data shared between PCs.
+/LocalTrainingData/
