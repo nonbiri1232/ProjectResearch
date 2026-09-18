@@ -22,6 +22,11 @@ public class MlAgents : Agent
         SelectAttackTarget
     }
 
+    // Optional presentation hooks. Training/ranking scenes keep direct execution.
+    public System.Func<PlayerAction, bool> ActionExecutor { get; set; }
+    public System.Func<bool> CanRequestAction { get; set; }
+    private bool deferredDecision;
+
     public Player myPlayer;
     public Player enemyPlayer;
     public GameManager gm;
@@ -64,6 +69,7 @@ public class MlAgents : Agent
         enemyPlayer = enemy;
         gm = manager;
         episodeFinished = false;
+        deferredDecision = false;
         episodeExecutedActions = 0;
         episodeInvalidSelections = 0;
         memoryProgressRewardScale = Academy.Instance.EnvironmentParameters
@@ -129,6 +135,13 @@ public class MlAgents : Agent
     private void Update()
     {
         if (gm == null || episodeFinished) return;
+        if (CanRequestAction != null && !CanRequestAction()) return;
+        if (deferredDecision)
+        {
+            deferredDecision = false;
+            if (ComputeIsMyTurn()) RequestDecision();
+            return;
+        }
 
         if (gm.decisionTick != lastTick)
         {
@@ -263,6 +276,11 @@ public class MlAgents : Agent
     public override void WriteDiscreteActionMask(IDiscreteActionMask actionMask)
     {
         if (episodeFinished || !ComputeIsMyTurn()) return;
+        if (CanRequestAction != null && !CanRequestAction())
+        {
+            deferredDecision = true;
+            return;
+        }
 
         bool[] enabled = BuildEnabledActions();
         bool hasEnabledAction = false;
@@ -510,6 +528,11 @@ public class MlAgents : Agent
     public override void OnActionReceived(ActionBuffers actions)
     {
         if (episodeFinished || !ComputeIsMyTurn()) return;
+        if (CanRequestAction != null && !CanRequestAction())
+        {
+            deferredDecision = true;
+            return;
+        }
 
         var discreteActions = actions.DiscreteActions;
         if (discreteActions.Length != 1)
@@ -709,7 +732,9 @@ public class MlAgents : Agent
             StatAggregationMethod.Histogram);
 
         int tickBeforeAction = gm.decisionTick;
-        bool isCorrect = gm.ExecuteAction(myPlayer, enemyPlayer, playerAction);
+        bool isCorrect = ActionExecutor != null
+            ? ActionExecutor(playerAction)
+            : gm.ExecuteAction(myPlayer, enemyPlayer, playerAction);
         ResetPendingDecision();
 
         if (!isCorrect && gm.currentState == GameState.WaitingForInput &&

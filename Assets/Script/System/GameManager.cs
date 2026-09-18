@@ -607,7 +607,7 @@ public class GameManager
         if(wait == move)return false;
         return true;
     }
-    public void WriteLog(LogType type,Card? ccard=null,List<Card>? ccards=null,int actionValue = 0)
+    public void WriteLog(LogType type,Card ccard=null,List<Card> ccards=null,int actionValue = 0)
     {
         int currentTurn = (systemTurn + 1) / 2;
         bool isP1 = (turn == player1);

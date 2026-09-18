@@ -9,7 +9,7 @@ using Unity.MLAgents.Policies;
 /// 人間対学習済みML-Agentsのオフライン対戦を管理する。
 /// 人間は保存済みDeck1、AIは指定された候補デッキからランダムに使用する。
 /// </summary>
-public class AIBattleManager : MonoBehaviour
+public class AIBattleManager : BattleManager
 {
     [Header("References")]
     [SerializeField] private MlAgents aiAgent;
@@ -32,7 +32,7 @@ public class AIBattleManager : MonoBehaviour
     [Tooltip("ON: Python Trainerへ接続して人間との対戦を学習。OFF: ONNXで推論のみ。")]
     [SerializeField] private bool learnFromHuman;
 
-    private GameManager gm;
+
     private Player humanPlayer;
     private Player aiPlayer;
     private int observedDecisionTick = -1;
@@ -43,14 +43,27 @@ public class AIBattleManager : MonoBehaviour
     public Player AIPlayer => aiPlayer;
     public GameManager Game => gm;
     public bool IsHumanTurn => gm != null && gm.turn == humanPlayer;
-    public PhaseState CurrentPhase => gm != null ? gm.currentPhase : PhaseState.Start;
-    public bool IsFinished => gm != null && gm.currentState == GameState.Finished;
+    public override PhaseState CurrentPhase => gm != null ? gm.currentPhase : PhaseState.Start;
+    public override bool IsFinished => gm != null && gm.currentState == GameState.Finished;
     public bool LearnFromHuman => learnFromHuman;
     public int CompletedMatches { get; private set; }
 
+    [Header("Shared battle view")]
+    [SerializeField] private BattleUIManager uiManager;
+    [SerializeField] private PlayerInputManager inputManager;
+    [SerializeField] private CardConect cardDatabase;
+    [SerializeField] private CardLayoutManager p1HandLayout, p1FieldLayout, p1GarbageLayout, p1DeckLayout, p1MariganLayout;
+    [SerializeField] private CardLayoutManager p2HandLayout, p2FieldLayout, p2GarbageLayout, p2DeckLayout;
+    [SerializeField] private Transform enemyAttackTarget;
+    private Player pendingWinner;
+    private bool selectingGarbage;
+    private UnityEngine.UI.Button garbageConfirmButton;
+    private CardLayoutManager[] AllLayouts => new[] { p1HandLayout, p1FieldLayout, p1GarbageLayout,
+        p1DeckLayout, p1MariganLayout, p2HandLayout, p2FieldLayout, p2GarbageLayout, p2DeckLayout };
+
     private void Start()
     {
-        if (aiAgent == null || visual == null)
+        if (aiAgent == null || (visual == null && uiManager == null))
         {
             Debug.LogError("AIBattleManager: aiAgentまたはvisualが設定されていません。");
             enabled = false;
@@ -67,22 +80,26 @@ public class AIBattleManager : MonoBehaviour
 
     private void Update()
     {
-        if (gm == null || gm.decisionTick == observedDecisionTick) return;
+        if (gm == null || isPresenting || gm.decisionTick == observedDecisionTick) return;
 
         observedDecisionTick = gm.decisionTick;
         NotifyBoardChanged();
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
-        if (gm != null)
+        if (gm != null) gm.OnGameFinished -= HandleGameFinished;
+        if (aiAgent != null)
         {
-            gm.OnGameFinished -= HandleGameFinished;
+            aiAgent.ActionExecutor = null;
+            aiAgent.CanRequestAction = null;
         }
+        base.OnDestroy();
     }
 
     private void StartBattle()
     {
+        pendingWinner = null;
         if (gm != null)
         {
             gm.OnGameFinished -= HandleGameFinished;
@@ -98,6 +115,8 @@ public class AIBattleManager : MonoBehaviour
 
         humanPlayer = new Player(humanDeck);
         aiPlayer = new Player(aiDeck);
+        localPlayer = humanPlayer;
+        remotePlayer = aiPlayer;
 
         bool aiGoesFirst = randomizeFirstPlayer && UnityEngine.Random.value < 0.5f;
         Player first = aiGoesFirst ? aiPlayer : humanPlayer;
@@ -108,8 +127,11 @@ public class AIBattleManager : MonoBehaviour
         observedDecisionTick = gm.decisionTick;
 
         if (!ConfigureAgentBehavior()) return;
+        aiAgent.ActionExecutor = action => ExecutePresentedAction(aiPlayer, humanPlayer, action);
+        aiAgent.CanRequestAction = () => !isPresenting;
         aiAgent.Initialize(aiPlayer, humanPlayer, gm);
-        visual.Initialize(this);
+        if (uiManager != null) InitializeBattleView();
+        else visual.Initialize(this);
         NotifyBoardChanged();
     }
 
@@ -191,7 +213,7 @@ public class AIBattleManager : MonoBehaviour
     public bool SubmitMarigan(List<Card> cards)
     {
         // 初手マリガンだけは先攻・後攻に関係なく同時進行する。
-        if (gm == null || gm.currentState != GameState.WaitingForInput ||
+        if (isPresenting || gm == null || gm.currentState != GameState.WaitingForInput ||
             gm.currentPhase != PhaseState.Start || gm.systemTurn != 1 ||
             !gm.NeedsMarigan(humanPlayer))
         {
@@ -383,16 +405,13 @@ public class AIBattleManager : MonoBehaviour
 
     private bool CanHumanAct()
     {
-        return gm != null && gm.currentState == GameState.WaitingForInput &&
+        return !isPresenting && gm != null && gm.currentState == GameState.WaitingForInput &&
                gm.turn == humanPlayer;
     }
 
     private bool ExecuteHumanAction(PlayerAction action)
     {
-        bool result = gm.ExecuteAction(humanPlayer, aiPlayer, action);
-        observedDecisionTick = gm.decisionTick;
-        NotifyBoardChanged();
-        return result;
+        return ExecutePresentedAction(humanPlayer, aiPlayer, action);
     }
 
     public void StartNextBattle()
@@ -408,7 +427,7 @@ public class AIBattleManager : MonoBehaviour
 
     public void SurrenderHuman()
     {
-        if (gm == null || gm.currentState == GameState.Finished) return;
+        if (isPresenting || gm == null || gm.currentState == GameState.Finished) return;
         gm.Surrender(humanPlayer);
     }
 
@@ -416,7 +435,8 @@ public class AIBattleManager : MonoBehaviour
     {
         CompletedMatches++;
         NotifyBoardChanged();
-        visual.ShowGameResult(winner == humanPlayer);
+        pendingWinner = winner;
+        if (!isPresenting) ShowResult();
         string mode = learnFromHuman ? "対人学習" : "AI対戦";
         Debug.Log(
             $"【{mode}】Episode {CompletedMatches} 終了 / " +
@@ -425,7 +445,237 @@ public class AIBattleManager : MonoBehaviour
 
     private void NotifyBoardChanged()
     {
+        if (isPresenting) return;
         BoardChanged?.Invoke();
-        if (visual != null) visual.Refresh();
+        if (uiManager != null) SyncBattleVisuals();
+        else if (visual != null) visual.Refresh();
     }
+
+    public override void SubmitPlay(CardData sourceData, bool addCost, List<CardData> targetDatas = null)
+    {
+        Card source = humanPlayer.hand.FirstOrDefault(c => c.uniqueId == sourceData.uniqueId);
+        var pool = humanPlayer.hand.Concat(humanPlayer.field).Concat(aiPlayer.field).ToList();
+        List<Card> targets = ResolveCards(targetDatas, pool);
+        if (targetDatas != null && targets == null) { p1HandLayout?.RefreshCard(); return; }
+        if (!PlayCard(source, targets, addCost)) p1HandLayout?.RefreshCard();
+    }
+
+    public override void SubmitAttack(CardData attackerData, CardData? targetData = null)
+    {
+        if (!CanAttackTarget(attackerData, targetData)) return;
+        Attack(humanPlayer.field.First(c => c.uniqueId == attackerData.uniqueId),
+            targetData.HasValue ? aiPlayer.field.First(c => c.uniqueId == targetData.Value.uniqueId) : null);
+    }
+
+    public override void SubmitEndTurn() { EndTurn(); }
+
+    public override void SubmitMarigan(List<CardData> data)
+    {
+        List<Card> cards = ResolveCards(data, humanPlayer.hand);
+        if (cards != null) SubmitMarigan(cards);
+    }
+
+    public override void SubmitSelfGarbage(List<CardData> data)
+    {
+        List<Card> cards = ResolveCards(data, humanPlayer.field);
+        if (cards != null) SubmitSelfGarbage(cards);
+    }
+
+    private static List<Card> ResolveCards(List<CardData> data, List<Card> pool)
+    {
+        var result = new List<Card>();
+        if (data == null) return result;
+        foreach (CardData item in data)
+        {
+            Card card = pool.FirstOrDefault(c => c.uniqueId == item.uniqueId);
+            if (card == null || result.Contains(card)) return null;
+            result.Add(card);
+        }
+        return result;
+    }
+
+    private bool ExecutePresentedAction(Player actor, Player enemy, PlayerAction action)
+    {
+        if (isPresenting) return false;
+        bool useView = uiManager != null;
+        bool attack = action.type == ActionType.Attack && action.sourceCard != null;
+        CardData source = action.sourceCard != null ? Card.PackingCard(action.sourceCard) : default;
+        CardLayoutManager field = actor == humanPlayer ? p1FieldLayout : p2FieldLayout;
+        CardLayoutManager targetField = actor == humanPlayer ? p2FieldLayout : p1FieldLayout;
+        Vector3 targetPosition = targetField != null ? targetField.CenterPosition : Vector3.zero;
+        if (attack && action.targetCard != null && action.targetCard.Count > 0)
+        {
+            GameObject obj = targetField?.FindCardObject(Card.PackingCard(action.targetCard[0]));
+            if (obj != null) targetPosition = obj.transform.position;
+        }
+        else if (attack && actor == humanPlayer && enemyAttackTarget != null)
+            targetPosition = enemyAttackTarget.position;
+
+        // Suppress board/result refresh raised synchronously inside ExecuteAction.
+        isPresenting = useView;
+        bool success = gm.ExecuteAction(actor, enemy, action);
+        observedDecisionTick = gm.decisionTick;
+        if (!success || !useView)
+        {
+            isPresenting = false;
+            NotifyBoardChanged();
+            ShowResult();
+            return success;
+        }
+        if (attack && field != null)
+            field.PlayAttack(source, targetPosition, () => StartCoroutine(FinishPresentation()));
+        else if (action.type == ActionType.Play && field != null)
+        {
+            Card card = action.sourceCard;
+            CardSetting setting = cardDatabase != null
+                ? cardDatabase.cards.FirstOrDefault(c => c.className == card.GetType().Name) : null;
+            field.PresentPlay(actor == humanPlayer ? p1HandLayout : p2HandLayout,
+                Card.PackingCard(card), actor == humanPlayer, setting?.ability, setting?.cardImage);
+            // Reveal even a Method that immediately goes to garbage before syncing.
+            StartCoroutine(FinishPresentation(0.55f));
+        }
+        else
+            StartCoroutine(FinishPresentation());
+        return true;
+    }
+
+    private System.Collections.IEnumerator FinishPresentation(float beforeSync = 0f)
+    {
+        if (beforeSync > 0f) yield return new WaitForSeconds(beforeSync);
+        SyncBattleVisuals();
+        // Layout movement takes 0.5 seconds; include deaths, draws and zone changes.
+        yield return new WaitForSeconds(0.55f);
+        isPresenting = false;
+        UpdateControls();
+        BoardChanged?.Invoke();
+        ShowResult();
+    }
+
+    private void InitializeBattleView()
+    {
+        StopAllCoroutines();
+        isPresenting = false;
+        pendingWinner = null;
+        selectingGarbage = false;
+        inputManager.ResetSelection();
+        inputManager.battleManager = this;
+        uiManager.battleManager = this;
+        uiManager.inputManager = inputManager;
+        if (uiManager.endGame != null) uiManager.endGame.SetActive(false);
+        if (visual != null) visual.enabled = false;
+        foreach (var layout in AllLayouts)
+        {
+            if (layout == null) continue;
+            layout.ClearCards();
+            layout.Initialize();
+        }
+        if (garbageConfirmButton == null)
+        {
+            garbageConfirmButton = CreateButton("選択してガベージ確定", uiManager.endTurnButton.transform.parent,
+                new Vector2(0.84f, 0.58f), () => inputManager.ConfirmSelfGarbage());
+            CreateButton("再戦", uiManager.endGame.transform, new Vector2(0.5f, 0.25f), StartNextBattle);
+            CreateButton("投了", uiManager.endTurnButton.transform.parent, new Vector2(0.93f, 0.95f), SurrenderHuman);
+        }
+        uiManager.ShowMarigan();
+        foreach (var layout in AllLayouts) layout?.BeginBatchUpdate();
+        SyncBattleVisuals();
+        foreach (var layout in AllLayouts) layout?.EndBatchUpdate();
+        inputManager.StartMariganSelection();
+        isPresenting = true;
+        StartCoroutine(FinishPresentation());
+    }
+
+    private UnityEngine.UI.Button CreateButton(string label, Transform parent, Vector2 anchor, UnityEngine.Events.UnityAction action)
+    {
+        var button = Instantiate(uiManager.endTurnButton, parent);
+        button.name = label;
+        // Clear serialized callbacks inherited from the template too.
+        button.onClick = new UnityEngine.UI.Button.ButtonClickedEvent();
+        button.onClick.AddListener(action);
+        button.interactable = true;
+        var rect = (RectTransform)button.transform;
+        rect.anchorMin = rect.anchorMax = anchor;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(240, 55);
+        var text = button.GetComponentInChildren<TMPro.TMP_Text>();
+        if (text != null) { text.text = label; text.fontSize = 22; }
+        button.gameObject.SetActive(true);
+        return button;
+    }
+
+    private void SyncBattleVisuals()
+    {
+        bool marigan = gm.NeedsMarigan(humanPlayer);
+        if (!marigan) uiManager.HideMarigan();
+        SyncPlayer(humanPlayer, p1DeckLayout, marigan ? p1MariganLayout : p1HandLayout,
+            p1FieldLayout, p1GarbageLayout);
+        SyncPlayer(aiPlayer, p2DeckLayout, p2HandLayout, p2FieldLayout, p2GarbageLayout);
+        uiManager.UpdateUI(gm, humanPlayer, aiPlayer);
+        UpdateControls();
+    }
+
+    private void SyncPlayer(Player owner, CardLayoutManager deck, CardLayoutManager hand,
+        CardLayoutManager field, CardLayoutManager garbage)
+    {
+        var zones = new[] { owner.deck, owner.hand, owner.field, owner.garbage };
+        var destinations = new[] { deck, hand, field, garbage };
+        var liveIds = new HashSet<int>(zones.SelectMany(z => z).Select(c => c.uniqueId));
+        bool ownsScope = gm.currentScope != null && gm.currentScope.player == owner;
+        if (ownsScope) liveIds.Add(gm.currentScope.uniqueId);
+        var ownerLayouts = owner == humanPlayer
+            ? new[] { p1DeckLayout, p1HandLayout, p1FieldLayout, p1GarbageLayout, p1MariganLayout }
+            : new[] { p2DeckLayout, p2HandLayout, p2FieldLayout, p2GarbageLayout };
+        foreach (var layout in ownerLayouts) layout?.RetainCards(liveIds);
+        for (int i = 0; i < zones.Length; i++)
+            foreach (Card card in zones[i]) SyncCard(owner, card, destinations[i]);
+        if (ownsScope) SyncCard(owner, gm.currentScope, field);
+    }
+
+    private void SyncCard(Player owner, Card card, CardLayoutManager destination)
+    {
+        if (destination == null) return;
+        CardData data = Card.PackingCard(card);
+        if (destination.FindCardObject(data) == null)
+        {
+            var source = AllLayouts.FirstOrDefault(l => l != null && l.FindCardObject(data) != null);
+            if (source != null) destination.ReceiveCard(source, data, source.FindCardObject(data));
+            else destination.CreateCard(data);
+        }
+        CardSetting setting = cardDatabase != null
+            ? cardDatabase.cards.FirstOrDefault(c => c.className == card.GetType().Name) : null;
+        bool visible = !destination.IsFaceDown;
+        destination.UpdateCard(data, owner == humanPlayer, visible ? setting?.ability : string.Empty,
+            visible, visible ? setting?.cardImage : null);
+    }
+
+    private void UpdateControls()
+    {
+        bool garbage = !IsFinished && gm.turn == humanPlayer && gm.currentPhase == PhaseState.Start && gm.systemTurn > 1;
+        if (garbage && !selectingGarbage) inputManager.StartSelfGarbageSelection();
+        selectingGarbage = garbage;
+        if (garbageConfirmButton != null)
+        {
+            garbageConfirmButton.gameObject.SetActive(garbage);
+            garbageConfirmButton.interactable = !isPresenting;
+        }
+        uiManager.endTurnButton.interactable = CanAct() && CurrentPhase == PhaseState.Main && !IsFinished;
+        if (uiManager.mariganConfirmButton != null)
+            uiManager.mariganConfirmButton.interactable = !isPresenting && gm.NeedsMarigan(humanPlayer);
+    }
+
+    private void ShowResult()
+    {
+        if (pendingWinner == null || isPresenting) return;
+        if (uiManager != null)
+        {
+            inputManager.ResetSelection();
+            uiManager.HideMarigan();
+            if (garbageConfirmButton != null) garbageConfirmButton.gameObject.SetActive(false);
+            uiManager.endGame.SetActive(true);
+            uiManager.endText.text = pendingWinner == humanPlayer ? "勝利" : "敗北";
+        }
+        else visual?.ShowGameResult(pendingWinner == humanPlayer);
+    }
+
 }

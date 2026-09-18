@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using DG.Tweening;
+using UnityEngine.UI;
 
 public enum FieldType
 {
@@ -39,6 +40,57 @@ public class CardLayoutManager : MonoBehaviour
 
     private List<CardData> cards = new List<CardData>();
     private List<GameObject> fieldClone = new List<GameObject>();
+    private bool isBatchUpdating;
+
+    public bool IsFaceDown => isFaceDown;
+
+    // Shared by local-network and AI battles, after successful rule execution.
+    public void PresentPlay(CardLayoutManager from, CardData data, bool isMyCard,
+        string ability, Sprite sprite)
+    {
+        GameObject obj = from != null ? from.FindCardObject(data) : null;
+        if (obj != null) ReceiveCard(from, data, obj);
+        else if (FindCardObject(data) == null) CreateCard(data, sprite);
+        UpdateCard(data, isMyCard, ability, true, sprite);
+    }
+
+    public void ClearCards()
+    {
+        foreach (GameObject obj in fieldClone)
+        {
+            if (obj == null) continue;
+            obj.transform.DOKill();
+            foreach (CardView view in obj.GetComponentsInChildren<CardView>())
+                view.SetHighlight(false);
+            obj.SetActive(false);
+            Destroy(obj);
+        }
+        fieldClone.Clear();
+        cards.Clear();
+        IsSelectionMode = false;
+    }
+
+    public void RetainCards(HashSet<int> liveIds)
+    {
+        bool removed = false;
+        for (int i = fieldClone.Count - 1; i >= 0; i--)
+        {
+            if (liveIds.Contains(cards[i].uniqueId)) continue;
+            GameObject obj = fieldClone[i];
+            obj.transform.DOKill();
+            obj.GetComponent<CardView>()?.SetHighlight(false);
+            obj.SetActive(false);
+            Destroy(obj);
+            fieldClone.RemoveAt(i);
+            cards.RemoveAt(i);
+            removed = true;
+        }
+        if (removed)
+        {
+            CalculateLayout(Mathf.Max(1, cards.Count));
+            RefreshCard();
+        }
+    }
 
     // BattleManager calls this only after the action has passed the game rules.
     public void PlayAttack(CardData attackerData, Vector3 targetPosition, System.Action onComplete)
@@ -72,7 +124,8 @@ public class CardLayoutManager : MonoBehaviour
         Destroy(effect, 3f);
     }
 
-    public void UpdateCard(CardData data, bool isMyCard, string abilityText)
+    public void UpdateCard(CardData data, bool isMyCard, string abilityText,
+        bool canShowAbility, Sprite sprite)
     {
         GameObject obj = FindCardObject(data);
         if (obj == null) return;
@@ -83,7 +136,7 @@ public class CardLayoutManager : MonoBehaviour
         view.IsMyCard = isMyCard;
         view.IsHandCard = fieldType == FieldType.Hand;
         view.IsFieldCard = fieldType == FieldType.Field;
-        view.AbilityText = abilityText;
+        view.SetPresentation(abilityText, canShowAbility, sprite, isFaceDown);
     }
 
     private void Awake()
@@ -91,6 +144,31 @@ public class CardLayoutManager : MonoBehaviour
         Initialize();
     }
 
+    public void CreateCard(CardData data,Sprite image)
+    {
+        GameObject cardObj = Instantiate(cardPrefab, leftTop, Quaternion.identity,drawField);
+
+        CardView view = cardObj.GetComponent<CardView>();
+        if(view != null)
+        {
+            view.SetImage(image);
+            view.Setup(data);
+            view.SetPresentation(string.Empty, false, null, isFaceDown);
+        }
+
+        cards.Add(data);
+        fieldClone.Add(cardObj);
+
+        cardObj.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
+
+        if (!isBatchUpdating)
+        {
+            CalculateLayout(cards.Count);
+            RefreshCard();
+        }
+
+
+    }
     public void CreateCard(CardData data)
     {
         GameObject cardObj = Instantiate(cardPrefab, leftTop, Quaternion.identity,drawField);
@@ -99,17 +177,48 @@ public class CardLayoutManager : MonoBehaviour
         if(view != null)
         {
             view.Setup(data);
+            view.SetPresentation(string.Empty, false, null, isFaceDown);
         }
 
         cards.Add(data);
         fieldClone.Add(cardObj);
 
-        cardObj.transform.localScale = Vector3.zero;
+        cardObj.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
 
-        CalculateLayout(cards.Count);
-        RefreshCard();
+        if (!isBatchUpdating)
+        {
+            CalculateLayout(cards.Count);
+            RefreshCard();
+        }
 
+        
+    }
 
+    public void BeginBatchUpdate()
+    {
+        isBatchUpdating = true;
+    }
+
+    public void EndBatchUpdate(bool animate = false)
+    {
+        isBatchUpdating = false;
+        CalculateLayout(Mathf.Max(1, cards.Count));
+        if (animate) RefreshCard();
+        else ApplyLayoutImmediate();
+    }
+
+    private void ApplyLayoutImmediate()
+    {
+        Vector3 targetRot = isFaceDown ? new Vector3(0, 180, 0) : Vector3.zero;
+        Vector3 targetScale = Vector3.one * currentScale;
+        for (int i = 0; i < fieldClone.Count && i < cardPos.Length; i++)
+        {
+            Transform card = fieldClone[i].transform;
+            card.DOKill();
+            card.position = cardPos[i];
+            card.localScale = targetScale;
+            card.eulerAngles = targetRot;
+        }
     }
     public void Initialize()
     {
@@ -261,7 +370,7 @@ public class CardLayoutManager : MonoBehaviour
         Vector3 targetRot = isFaceDown ? new Vector3(0, 180, 0) : Vector3.zero;
         Vector3 targetScale = Vector3.one * currentScale;
 
-        Sequence seq = DOTween.Sequence();
+        Sequence seq = DOTween.Sequence().SetTarget(card.transform);
 
         switch (fieldType)
         {
@@ -317,7 +426,7 @@ public class CardLayoutManager : MonoBehaviour
 
         card.transform.localScale = Vector3.zero; // 最初は見えない
 
-        Sequence seq = DOTween.Sequence();
+        Sequence seq = DOTween.Sequence().SetTarget(card.transform);
         seq.Append(card.transform.DOScale(targetScale, 0.3f).SetEase(Ease.OutBack));
         seq.Join(card.transform.DOJump(targetPosVec, 1.0f, 1, 0.5f).SetEase(Ease.OutQuad));
         seq.Join(card.transform.DORotate(targetRot, 0.5f));

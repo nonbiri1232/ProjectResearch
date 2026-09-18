@@ -23,6 +23,7 @@ public class DebugBattleManager : BattleManager
     [SerializeField] private CardLayoutManager p2GarbageLayout;
     [SerializeField] private CardLayoutManager p2DeckLayout;
     [SerializeField] private Transform enemyAttackTarget;
+    [SerializeField] private Sprite fallbackCardImage;
     private float enemyTurnTimer = 0f;
 
     private void Start()
@@ -33,6 +34,21 @@ public class DebugBattleManager : BattleManager
     private void Update()
     {
         if (gm == null || isPresenting) return;
+
+        // 2ターン目以降のStartフェーズではセルフガベージの決定が必要。
+        // Debug画面には選択UIがないため、未選択（0枚）で確定してMainへ進める。
+        if (gm.currentPhase == PhaseState.Start && gm.systemTurn > 1 &&
+            gm.currentState == GameState.WaitingForInput)
+        {
+            Player activePlayer = gm.turn;
+            Player waitingPlayer = activePlayer == localPlayer ? remotePlayer : localPlayer;
+            if (gm.ExecuteAction(activePlayer, waitingPlayer,
+                new PlayerAction(ActionType.SelfGarbage, new List<Card>())))
+            {
+                SyncBattleVisuals();
+            }
+            return;
+        }
 
         // 相手のターンで入力待ち状態になったら、カウントを進める
         if (gm.turn == remotePlayer && gm.currentState == GameState.WaitingForInput)
@@ -49,15 +65,27 @@ public class DebugBattleManager : BattleManager
     }
     private void SimulateEnemyTurn()
     {
-        Debug.Log("【Debug】相手のターンを自動スキップします。");
+        Debug.Log("【Debug】相手のターンです。");
 
         // 1. 相手がドローした分のカードを画面上に生成（裏向き）
         SyncHandVisuals(remotePlayer, p2HandLayout);
+        
+        // 2.手持ちのカードにプレイできるものがあればプレイさせる
+        foreach(Card c in remotePlayer.hand)
+        {
+            if(remotePlayer.maxMemory - remotePlayer.fieldCost >= c.Cost && c.Cost <= remotePlayer.usableMemory - remotePlayer.usedMemory)
+            {
+                Debug.Log("カードをプレイしました。");
+                gm.ExecuteAction(remotePlayer, localPlayer, new PlayerAction(ActionType.Play,c));
+                SyncBattleVisuals();
+                break;
+            }
+        }
 
-        // 2. 相手が「ターン終了」を宣言したことにして、GameManagerの処理を進める
+        // 3. 相手が「ターン終了」を宣言したことにして、GameManagerの処理を進める
         gm.ExecuteAction(remotePlayer, localPlayer, new PlayerAction(ActionType.End));
 
-        // 3. 自分のターンに戻り、自分が新しくドローした分のカードを画面に生成
+        // 4. 自分のターンに戻り、自分が新しくドローした分のカードを画面に生成
         SyncHandVisuals(localPlayer, p1HandLayout);
         SyncBattleVisuals();
         
@@ -102,8 +130,9 @@ public class DebugBattleManager : BattleManager
         List<Card> deck2 = new List<Card>();
         for (int i = 0; i < 40; i++)
         {
+            // 対象を必要としない1コストObjectで、プレイと攻撃を確認できるデバッグデッキにする。
             deck1.Add(Card.CreateCardInstance(1));
-            deck2.Add(Card.CreateCardInstance(2));
+            deck2.Add(Card.CreateCardInstance(1));
         }
 
         localPlayer = new Player(deck1);
@@ -112,10 +141,30 @@ public class DebugBattleManager : BattleManager
         gm = new GameManager(localPlayer, remotePlayer);
 
         // 1. デッキのカードをすべて視覚的に生成する
-        foreach (Card c in localPlayer.deck) p1DeckLayout.CreateCard(CreateCardData(c));
-        foreach (Card c in localPlayer.hand) p1DeckLayout.CreateCard(CreateCardData(c)); // 引く前の手札も一旦デッキに生成
-        foreach (Card c in remotePlayer.deck) p2DeckLayout.CreateCard(CreateCardData(c));
-        foreach (Card c in remotePlayer.hand) p2DeckLayout.CreateCard(CreateCardData(c));
+        p1DeckLayout.BeginBatchUpdate();
+        p2DeckLayout.BeginBatchUpdate();
+        foreach (Card c in localPlayer.deck){
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p1DeckLayout.CreateCard(CreateCardData(c),image);
+        }
+        foreach (Card c in localPlayer.hand){
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p1DeckLayout.CreateCard(CreateCardData(c),image);
+        } // 引く前の手札も一旦デッキに生成
+        foreach (Card c in remotePlayer.deck) {
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p2DeckLayout.CreateCard(CreateCardData(c),image);
+        }
+        foreach (Card c in remotePlayer.hand) {
+            var image = GetCardImage(c);
+            Debug.Log($"{image}");
+            p2DeckLayout.CreateCard(CreateCardData(c),image);
+        }
+        p1DeckLayout.EndBatchUpdate();
+        p2DeckLayout.EndBatchUpdate();
 
         // 2. デッキから初手を手札に引く（シームレスな移動）
         foreach (Card c in localPlayer.hand)
@@ -124,10 +173,7 @@ public class DebugBattleManager : BattleManager
             GameObject obj = p1DeckLayout.FindCardObject(data);
             p1HandLayout.ReceiveCard(p1DeckLayout, data, obj);
             
-            CardView view = obj.GetComponent<CardView>();
-            view.IsHandCard = true;
-            view.IsMyCard = true;
-            view.AbilityText = GetAbilityText(c);
+            p1HandLayout.UpdateCard(data, true, GetAbilityText(c), true, GetCardImage(c));
         }
 
         uiManager.UpdateUI(gm, localPlayer, remotePlayer);
@@ -143,6 +189,7 @@ public class DebugBattleManager : BattleManager
                 CardData data = CreateCardData(c);
                 GameObject obj = p1HandLayout.FindCardObject(data);
                 p1MariganLayout.ReceiveCard(p1HandLayout, data, obj);
+                p1MariganLayout.UpdateCard(data, true, GetAbilityText(c), true, GetCardImage(c));
             }
             
             inputManager.StartMariganSelection(); // マウスクラスをマリガン状態へ
@@ -191,16 +238,13 @@ public class DebugBattleManager : BattleManager
                     if (inDeck != null)
                     {
                         p1HandLayout.ReceiveCard(p1DeckLayout, data, inDeck);
-                        CardView view = inDeck.GetComponent<CardView>();
-                        view.IsHandCard = true;
-                        view.IsMyCard = true;
-                        view.AbilityText = GetAbilityText(c); // 新しいカードにも能力をセット
+                        p1HandLayout.UpdateCard(data, true, GetAbilityText(c), true, GetCardImage(c));
                     }
                 }
             }
             
             uiManager.HideMarigan();
-            uiManager.UpdateUI(gm, localPlayer, remotePlayer);
+            SyncBattleVisuals();
         }
     }
 
@@ -286,7 +330,15 @@ public class DebugBattleManager : BattleManager
                 if (source != null) destination.ReceiveCard(source, data, source.FindCardObject(data));
                 else destination.CreateCard(data);
             }
-            destination.UpdateCard(data, owner == localPlayer, GetAbilityText(card));
+            bool canShowAbility = !destination.IsFaceDown &&
+                ((owner == localPlayer && (destination == p1HandLayout || destination == p1FieldLayout)) ||
+                 (owner == remotePlayer && destination == p2FieldLayout));
+            destination.UpdateCard(
+                data,
+                owner == localPlayer,
+                canShowAbility ? GetAbilityText(card) : string.Empty,
+                canShowAbility,
+                destination.IsFaceDown ? null : GetCardImage(card));
         }
     }
 
@@ -296,14 +348,52 @@ public class DebugBattleManager : BattleManager
         if (gm.ExecuteAction(localPlayer, remotePlayer, new PlayerAction(ActionType.End)))
             SyncBattleVisuals();
     }
-    public override void SubmitSelfGarbage(List<CardData> selectedCardsData) { }
+    public override void SubmitSelfGarbage(List<CardData> selectedCardsData)
+    {
+        if (!CanAct() || gm.currentPhase != PhaseState.Start || gm.systemTurn == 1) return;
+
+        List<Card> selectedCards = new List<Card>();
+        if (selectedCardsData != null)
+        {
+            foreach (CardData data in selectedCardsData)
+            {
+                Card card = localPlayer.field.FirstOrDefault(c => c.uniqueId == data.uniqueId);
+                if (card == null) return;
+                selectedCards.Add(card);
+            }
+        }
+
+        if (gm.ExecuteAction(localPlayer, remotePlayer,
+            new PlayerAction(ActionType.SelfGarbage, selectedCards)))
+        {
+            SyncBattleVisuals();
+        }
+    }
 
     private string GetAbilityText(Card c)
     {
-        if (cardDatabase == null) return "能力テキストなし";
-        string className = c.GetType().Name;
-        CardSetting setting = cardDatabase.cards.FirstOrDefault(s => s.className == className);
+        CardSetting setting = GetCardSetting(c);
         return setting != null ? setting.ability : "能力テキストなし";
+    }
+
+    private Sprite GetCardImage(Card c)
+    {
+        CardSetting setting = GetCardSetting(c);
+        Sprite sprite = setting != null ? setting.cardImage : null;
+        if (sprite == null)
+        {
+            Debug.LogWarning(setting != null
+                ? $"CardImage が未設定です: {setting.className}"
+                : $"CardSetting が見つかりませんでした: {c?.GetType().Name}");
+        }
+        return sprite != null ? sprite : fallbackCardImage;
+    }
+
+    private CardSetting GetCardSetting(Card c)
+    {
+        if (cardDatabase == null || c == null) return null;
+        string className = c.GetType().Name;
+        return cardDatabase.cards.FirstOrDefault(s => s.className == className);
     }
 
     private CardData CreateCardData(Card c)
