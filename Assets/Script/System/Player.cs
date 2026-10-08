@@ -18,6 +18,11 @@ public class Player
     public Random rand;
 
     public event Action<Card> OnFailSafeTriggered;
+    public event Action<Card> OnCardSpawned;
+    public void TriggerCardSpawned(Card spawnedCard)
+    {
+        OnCardSpawned?.Invoke(spawnedCard);
+    }
     public Player(List<Card> Deck)
     {
         deck.AddRange(Deck);
@@ -79,16 +84,20 @@ public class Player
         if(hand.Count >= 8)
         {
             garbage.Add(c);
+            gm.WriteLog(LogType.DrawGabage,null,new List<Card>(new Card[]{c}),1);
         }
         else
         {
             hand.Add(c);
+            gm.WriteLog(LogType.DrawHand,null,new List<Card>(new Card[]{c}),1);
         }
         return false;
     }
 
     public bool Draw(int num)
     {
+        List<Card> handCards = new List<Card>();
+        List<Card> garbageCards = new List<Card>();
         for(int i = 0;i < num; i++)
         {
             if(deck.Count <= 0)
@@ -101,12 +110,21 @@ public class Player
             if(hand.Count >= 8)
             {
                 garbage.Add(c);
+                garbageCards.Add(c);
+
             }
             else
             {
                 hand.Add(c);
+                handCards.Add(c);
             }
         }
+        
+        if(garbageCards.Count > 0)
+            gm.WriteLog(LogType.DrawHand,null,handCards,1);
+        if(garbageCards.Count > 0)
+            gm.WriteLog(LogType.DrawGabage,null,garbageCards,garbageCards.Count);
+            
         return false;
     }
 
@@ -257,6 +275,7 @@ public class Player
             c.Hp = data.hp;
             c.Cost = data.cost;
             c.isCanAttack = data.canAttackNow;
+            c.isProxy = data.isProxy;
         }
         return deck;
     }

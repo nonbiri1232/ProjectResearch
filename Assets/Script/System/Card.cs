@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Xml;
 public enum where
 {
     None,
@@ -32,6 +33,8 @@ public class Card
 
     public Player player;
     public Crest cr;
+    protected static int NowUniqueId = 0;
+    public int uniqueId{get;private set;}
     public bool isCanAttack{get;set;} = true;
     public bool isFirstTurn{get;set;} = true;
     public bool Proxy{get;set;}
@@ -88,6 +91,10 @@ public class Card
 
     private readonly List<Action<Player, List<Card>>> additionalDestructorEffects = new List<Action<Player, List<Card>>>();
 
+    public Card()
+    {
+        uniqueId = NowUniqueId++;
+    }
     public void AddDestructorEffect(Action<Player, List<Card>> effect)
     {
         if (effect != null)
@@ -357,7 +364,41 @@ public class Card
         c.Hp = card.hp;
         c.Cost = card.cost;
         c.isCanAttack = card.canAttackNow;
+        c.isProxy = card.isProxy;
 
         return c;
+    }
+    public static CardData PackingCard(Card card)
+    {
+    
+        CardData cardData = new CardData();
+        cardData.id = GetCardId(card);
+        cardData.atk = card.Attack;
+        cardData.hp = card.Hp;
+        cardData.cost = card.Cost;
+        cardData.canAttackNow = (card != null &&
+            card.Type == Card.CardType.Object &&
+            card.player == card.player.gm.turn &&
+            card.player.gm.currentPhase == PhaseState.Main &&
+            card.player.field.Contains(card) &&
+            card.isCanAttack &&
+            (!card.isFirstTurn || card.isImmediate) &&
+            card.isAttacked < card.attackTimes);
+        cardData.uniqueId = card.uniqueId;
+        cardData.type = (card.Type == CardType.Object?1:card.Type == CardType.Method?2:3);
+        cardData.isProxy = card.isProxy;
+
+        return cardData;
+    }
+    public static List<CardData> PackingCard(List<Card> cards)
+    {
+        List<CardData> cardDatas = new List<CardData>();
+        foreach(var c in cards)
+        {
+            CardData cardData = PackingCard(c);
+
+            cardDatas.Add(cardData);
+        }
+        return cardDatas;
     }
 }
